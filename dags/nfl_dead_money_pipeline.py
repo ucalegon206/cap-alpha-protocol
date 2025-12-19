@@ -1,4 +1,39 @@
 """
+Daily NFL Dead Money Pipeline DAG for Apache Airflow.
+
+This DAG orchestrates a comprehensive data pipeline for NFL dead money analysis,
+integrating data from multiple sources (Pro Football Reference rosters and Spotrac
+team cap data) and transforming it through staging, normalization, and mart layers.
+
+Pipeline Flow:
+1. Snapshot Spotrac team cap data and player rankings (weekly and backfill)
+2. Stage raw Spotrac data into staging layer
+3. Validate staging tables for data quality
+4. Run dbt seed to load reference data
+5. Transform staging data using dbt (staging layer)
+6. Normalize and process data into marts layer
+7. Scrape PFR rosters for years 2015 to current
+8. Merge dead money data with roster contracts
+9. Run final data quality validation
+
+Configuration:
+- Schedule: Weekly (@weekly)
+- Owner: nfl-analytics
+- Retries: 2 (with 5-minute delay)
+- Email notifications: On failure only
+- Catchup: Disabled
+
+Dependencies:
+- src.pipeline_tasks: Core ETL functions for scraping, merging, and validation
+- src.ingestion: Spotrac data staging functions
+- src.normalization: Data normalization utilities
+- dbt: Data transformation and mart generation
+- Apache Airflow: Workflow orchestration
+
+Note:
+- Hardcoded local paths should be parameterized for production deployment
+- Player rankings backfill is a one-time load for historical years (2011-2024)
+- Debug mode available for local task testing
 Daily NFL Dead Money Pipeline (PFR rosters + dead money CSV).
 
 Steps:
@@ -25,8 +60,13 @@ from src.pipeline_tasks import validate_staging
 from src.ingestion import stage_spotrac_team_cap, stage_spotrac_player_rankings, stage_spotrac_dead_money
 from src.normalization import normalize_team_cap, normalize_player_rankings, normalize_dead_money
 from airflow.operators.bash import BashOperator
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Project root: parent directory of dags/
+PROJECT_ROOT = str(Path(__file__).parent.parent.absolute())
 
 # TODO: Define configuration
 DEFAULT_ARGS = {
@@ -123,37 +163,36 @@ scrape_task >> merge_task >> validation_task
 # Weekly Spotrac team cap snapshot (cron via Airflow schedule)
 team_cap_snapshot = BashOperator(
     task_id='snapshot_spotrac_team_cap',
-    bash_command='cd /Users/andrewsmith/Documents/portfolio/nfl-dead-money && ./.venv/bin/python scripts/download_spotrac_data.py --snapshot-team-cap --year {{ ds.strftime("%Y") }} --method auto',
+    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/download_spotrac_data.py --snapshot-team-cap --year {{{{ ds.strftime("%Y") }}}} --method auto',
     dag=dag,
 )
 
 # One-time player rankings backfill (2011-2024)
 player_rankings_backfill = BashOperator(
     task_id='snapshot_player_rankings_2011_2024',
-    bash_command='cd /Users/andrewsmith/Documents/portfolio/nfl-dead-money && ./.venv/bin/python scripts/download_spotrac_data.py --snapshot-player-rankings --start-year 2011 --end-year 2024 --method auto',
+    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/download_spotrac_data.py --snapshot-player-rankings --start-year 2011 --end-year 2024 --method auto',
     dag=dag,
 )
 dbt_seed = BashOperator(
     task_id='dbt_seed_spotrac',
-    bash_command='cd /Users/andrewsmith/Documents/portfolio/nfl-dead-money/dbt && ../../.venv/bin/dbt seed --project-dir . --profiles-dir .',
+    bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt seed --project-dir . --profiles-dir .',
     dag=dag,
 )
 
 dbt_run_staging = BashOperator(
     task_id='dbt_run_staging',
-    bash_command='cd /Users/andrewsmith/Documents/portfolio/nfl-dead-money/dbt && ../../.venv/bin/dbt run --select staging --project-dir . --profiles-dir .',
+    bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt run --select staging --project-dir . --profiles-dir .',
     dag=dag,
 )
 
 dbt_run_marts = BashOperator(
     task_id='dbt_run_marts',
-    bash_command='cd /Users/andrewsmith/Documents/portfolio/nfl-dead-money/dbt && ../../.venv/bin/dbt run --select marts --project-dir . --profiles-dir .',
+    bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt run --select marts --project-dir . --profiles-dir .',
     dag=dag,
 )
 
 # Integrate snapshots into pipeline ordering: run snapshots before merge
-team_cap_snapshot >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> scrape_task
-player_rankings_backfill >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> scrape_task
+[team_cap_snapshot, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> scrape_task
 
 
 if __name__ == "__main__":

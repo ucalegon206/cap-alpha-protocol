@@ -2494,3 +2494,248 @@ alter table "nfl_dead_money"."main_marts"."fct_dead_money_by_player__dbt_tmp" re
 [0m16:21:46.485334 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x116167b70>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x113e36710>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x113e36ad0>]}
 [0m16:21:46.485442 [debug] [MainThread]: Flushing usage events
 [0m16:21:47.156474 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m20:22:52.446853 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x109b1bb60>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10e867c50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10e867ed0>]}
+
+
+============================== 20:22:52.449608 | 465801c5-6cc1-4e8e-9738-f2f4fb975a6e ==============================
+[0m20:22:52.449608 [info ] [MainThread]: Running with dbt=1.10.15
+[0m20:22:52.449847 [debug] [MainThread]: running dbt with arguments {'indirect_selection': 'eager', 'version_check': 'True', 'no_print': 'None', 'empty': 'None', 'invocation_command': 'dbt seed --project-dir ./dbt --profiles-dir ./dbt', 'use_experimental_parser': 'False', 'fail_fast': 'False', 'cache_selected_only': 'False', 'warn_error': 'None', 'log_format': 'default', 'introspect': 'True', 'profiles_dir': './dbt', 'printer_width': '80', 'target_path': 'None', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'log_cache_events': 'False', 'write_json': 'True', 'partial_parse': 'True', 'use_colors': 'True', 'static_parser': 'True', 'log_path': 'dbt/logs', 'send_anonymous_usage_stats': 'True', 'debug': 'False', 'quiet': 'False'}
+[0m20:22:52.586111 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '465801c5-6cc1-4e8e-9738-f2f4fb975a6e', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x109fb10f0>]}
+[0m20:22:52.605935 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '465801c5-6cc1-4e8e-9738-f2f4fb975a6e', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10e995ae0>]}
+[0m20:22:52.607157 [info ] [MainThread]: Registered adapter: duckdb=1.10.0
+[0m20:22:52.645920 [debug] [MainThread]: checksum: 14a228079bd6df63ba81633f9a3cf44ecfaa31056ac397c602753ec895dbf885, vars: {}, profile: , target: , version: 1.10.15
+[0m20:22:52.711254 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m20:22:52.711449 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m20:22:52.714083 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 1 unused configuration paths:
+- seeds.nfl_dead_money.spotrac_team_cap
+[0m20:22:52.735405 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': '465801c5-6cc1-4e8e-9738-f2f4fb975a6e', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10f0b6e50>]}
+[0m20:22:52.777178 [debug] [MainThread]: Wrote artifact WritableManifest to dbt/target/manifest.json
+[0m20:22:52.778799 [debug] [MainThread]: Wrote artifact SemanticManifest to dbt/target/semantic_manifest.json
+[0m20:22:52.791686 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': '465801c5-6cc1-4e8e-9738-f2f4fb975a6e', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ef2ba70>]}
+[0m20:22:52.791906 [info ] [MainThread]: Found 10 models, 1 seed, 2 operations, 34 data tests, 4 sources, 469 macros
+[0m20:22:52.792022 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '465801c5-6cc1-4e8e-9738-f2f4fb975a6e', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10f3b2190>]}
+[0m20:22:52.793012 [info ] [MainThread]: 
+[0m20:22:52.793208 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m20:22:52.793321 [info ] [MainThread]: 
+[0m20:22:52.793535 [debug] [MainThread]: Acquiring new duckdb connection 'master'
+[0m20:22:52.793908 [debug] [ThreadPool]: Acquiring new duckdb connection 'list_nfl_dead_money'
+[0m20:22:52.826597 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money"
+[0m20:22:52.826794 [debug] [ThreadPool]: On list_nfl_dead_money: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "connection_name": "list_nfl_dead_money"} */
+
+    
+    select schema_name
+    from system.information_schema.schemata
+    
+    where lower(catalog_name) = '"nfl_dead_money"'
+    
+  
+  
+[0m20:22:52.826906 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m20:22:52.836602 [debug] [ThreadPool]: SQL status: OK in 0.010 seconds
+[0m20:22:52.837194 [debug] [ThreadPool]: On list_nfl_dead_money: Close
+[0m20:22:52.837466 [debug] [ThreadPool]: Re-using an available connection from the pool (formerly list_nfl_dead_money, now create_nfl_dead_money_main)
+[0m20:22:52.837625 [debug] [ThreadPool]: Creating schema "database: "nfl_dead_money"
+schema: "main"
+"
+[0m20:22:52.840006 [debug] [ThreadPool]: Using duckdb connection "create_nfl_dead_money_main"
+[0m20:22:52.840120 [debug] [ThreadPool]: On create_nfl_dead_money_main: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "connection_name": "create_nfl_dead_money_main"} */
+
+    
+        select type from duckdb_databases()
+        where lower(database_name)='nfl_dead_money'
+        and type='sqlite'
+    
+  
+[0m20:22:52.840203 [debug] [ThreadPool]: Opening a new connection, currently in state closed
+[0m20:22:52.840795 [debug] [ThreadPool]: SQL status: OK in 0.001 seconds
+[0m20:22:52.841289 [debug] [ThreadPool]: Using duckdb connection "create_nfl_dead_money_main"
+[0m20:22:52.841387 [debug] [ThreadPool]: On create_nfl_dead_money_main: BEGIN
+[0m20:22:52.841559 [debug] [ThreadPool]: SQL status: OK in 0.000 seconds
+[0m20:22:52.841648 [debug] [ThreadPool]: Using duckdb connection "create_nfl_dead_money_main"
+[0m20:22:52.841734 [debug] [ThreadPool]: On create_nfl_dead_money_main: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "connection_name": "create_nfl_dead_money_main"} */
+
+    
+    
+        create schema if not exists "nfl_dead_money"."main"
+    
+[0m20:22:52.841943 [debug] [ThreadPool]: SQL status: OK in 0.000 seconds
+[0m20:22:52.842223 [debug] [ThreadPool]: On create_nfl_dead_money_main: COMMIT
+[0m20:22:52.842328 [debug] [ThreadPool]: Using duckdb connection "create_nfl_dead_money_main"
+[0m20:22:52.842416 [debug] [ThreadPool]: On create_nfl_dead_money_main: COMMIT
+[0m20:22:52.842702 [debug] [ThreadPool]: SQL status: OK in 0.000 seconds
+[0m20:22:52.842881 [debug] [ThreadPool]: On create_nfl_dead_money_main: Close
+[0m20:22:52.844931 [debug] [ThreadPool]: Re-using an available connection from the pool (formerly create_nfl_dead_money_main, now list_nfl_dead_money_main_intermediate)
+[0m20:22:52.847096 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main_intermediate"
+[0m20:22:52.847282 [debug] [ThreadPool]: Acquiring new duckdb connection 'list_nfl_dead_money_main'
+[0m20:22:52.847401 [debug] [ThreadPool]: On list_nfl_dead_money_main_intermediate: BEGIN
+[0m20:22:52.847561 [debug] [ThreadPool]: Acquiring new duckdb connection 'list_nfl_dead_money_main_staging'
+[0m20:22:52.848240 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main"
+[0m20:22:52.848404 [debug] [ThreadPool]: Acquiring new duckdb connection 'list_nfl_dead_money_main_marts'
+[0m20:22:52.848548 [debug] [ThreadPool]: Opening a new connection, currently in state closed
+[0m20:22:52.849138 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main_staging"
+[0m20:22:52.849242 [debug] [ThreadPool]: On list_nfl_dead_money_main: BEGIN
+[0m20:22:52.849899 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main_marts"
+[0m20:22:52.850092 [debug] [ThreadPool]: On list_nfl_dead_money_main_staging: BEGIN
+[0m20:22:52.850193 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m20:22:52.850298 [debug] [ThreadPool]: SQL status: OK in 0.002 seconds
+[0m20:22:52.850393 [debug] [ThreadPool]: On list_nfl_dead_money_main_marts: BEGIN
+[0m20:22:52.850481 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m20:22:52.850613 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main_intermediate"
+[0m20:22:52.850699 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m20:22:52.850789 [debug] [ThreadPool]: SQL status: OK in 0.001 seconds
+[0m20:22:52.850935 [debug] [ThreadPool]: On list_nfl_dead_money_main_intermediate: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "connection_name": "list_nfl_dead_money_main_intermediate"} */
+select
+      'nfl_dead_money' as database,
+      table_name as name,
+      table_schema as schema,
+      CASE table_type
+        WHEN 'BASE TABLE' THEN 'table'
+        WHEN 'VIEW' THEN 'view'
+        WHEN 'LOCAL TEMPORARY' THEN 'table'
+        END as type
+    from system.information_schema.tables
+    where lower(table_schema) = 'main_intermediate'
+    and lower(table_catalog) = 'nfl_dead_money'
+  
+[0m20:22:52.851080 [debug] [ThreadPool]: SQL status: OK in 0.001 seconds
+[0m20:22:52.851170 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main"
+[0m20:22:52.851272 [debug] [ThreadPool]: SQL status: OK in 0.001 seconds
+[0m20:22:52.851416 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main_staging"
+[0m20:22:52.851519 [debug] [ThreadPool]: On list_nfl_dead_money_main: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "connection_name": "list_nfl_dead_money_main"} */
+select
+      'nfl_dead_money' as database,
+      table_name as name,
+      table_schema as schema,
+      CASE table_type
+        WHEN 'BASE TABLE' THEN 'table'
+        WHEN 'VIEW' THEN 'view'
+        WHEN 'LOCAL TEMPORARY' THEN 'table'
+        END as type
+    from system.information_schema.tables
+    where lower(table_schema) = 'main'
+    and lower(table_catalog) = 'nfl_dead_money'
+  
+[0m20:22:52.851618 [debug] [ThreadPool]: Using duckdb connection "list_nfl_dead_money_main_marts"
+[0m20:22:52.851714 [debug] [ThreadPool]: On list_nfl_dead_money_main_staging: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "connection_name": "list_nfl_dead_money_main_staging"} */
+select
+      'nfl_dead_money' as database,
+      table_name as name,
+      table_schema as schema,
+      CASE table_type
+        WHEN 'BASE TABLE' THEN 'table'
+        WHEN 'VIEW' THEN 'view'
+        WHEN 'LOCAL TEMPORARY' THEN 'table'
+        END as type
+    from system.information_schema.tables
+    where lower(table_schema) = 'main_staging'
+    and lower(table_catalog) = 'nfl_dead_money'
+  
+[0m20:22:52.851899 [debug] [ThreadPool]: On list_nfl_dead_money_main_marts: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "connection_name": "list_nfl_dead_money_main_marts"} */
+select
+      'nfl_dead_money' as database,
+      table_name as name,
+      table_schema as schema,
+      CASE table_type
+        WHEN 'BASE TABLE' THEN 'table'
+        WHEN 'VIEW' THEN 'view'
+        WHEN 'LOCAL TEMPORARY' THEN 'table'
+        END as type
+    from system.information_schema.tables
+    where lower(table_schema) = 'main_marts'
+    and lower(table_catalog) = 'nfl_dead_money'
+  
+[0m20:22:52.858117 [debug] [ThreadPool]: SQL status: OK in 0.006 seconds
+[0m20:22:52.858332 [debug] [ThreadPool]: SQL status: OK in 0.006 seconds
+[0m20:22:52.858517 [debug] [ThreadPool]: SQL status: OK in 0.007 seconds
+[0m20:22:52.858637 [debug] [ThreadPool]: SQL status: OK in 0.007 seconds
+[0m20:22:52.859118 [debug] [ThreadPool]: On list_nfl_dead_money_main_marts: ROLLBACK
+[0m20:22:52.859537 [debug] [ThreadPool]: On list_nfl_dead_money_main_staging: ROLLBACK
+[0m20:22:52.859967 [debug] [ThreadPool]: On list_nfl_dead_money_main_intermediate: ROLLBACK
+[0m20:22:52.860380 [debug] [ThreadPool]: On list_nfl_dead_money_main: ROLLBACK
+[0m20:22:52.861157 [debug] [ThreadPool]: Failed to rollback 'list_nfl_dead_money_main_marts'
+[0m20:22:52.861363 [debug] [ThreadPool]: Failed to rollback 'list_nfl_dead_money_main'
+[0m20:22:52.861556 [debug] [ThreadPool]: Failed to rollback 'list_nfl_dead_money_main_staging'
+[0m20:22:52.861658 [debug] [ThreadPool]: On list_nfl_dead_money_main_marts: Close
+[0m20:22:52.861850 [debug] [ThreadPool]: Failed to rollback 'list_nfl_dead_money_main_intermediate'
+[0m20:22:52.861964 [debug] [ThreadPool]: On list_nfl_dead_money_main: Close
+[0m20:22:52.862063 [debug] [ThreadPool]: On list_nfl_dead_money_main_staging: Close
+[0m20:22:52.862182 [debug] [ThreadPool]: On list_nfl_dead_money_main_intermediate: Close
+[0m20:22:52.862668 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '465801c5-6cc1-4e8e-9738-f2f4fb975a6e', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10f2d2ea0>]}
+[0m20:22:52.862858 [debug] [MainThread]: Using duckdb connection "master"
+[0m20:22:52.862954 [debug] [MainThread]: On master: BEGIN
+[0m20:22:52.863040 [debug] [MainThread]: Opening a new connection, currently in state init
+[0m20:22:52.863267 [debug] [MainThread]: SQL status: OK in 0.000 seconds
+[0m20:22:52.863356 [debug] [MainThread]: On master: COMMIT
+[0m20:22:52.863447 [debug] [MainThread]: Using duckdb connection "master"
+[0m20:22:52.863527 [debug] [MainThread]: On master: COMMIT
+[0m20:22:52.863686 [debug] [MainThread]: SQL status: OK in 0.000 seconds
+[0m20:22:52.866185 [info ] [MainThread]: Starting dbt run for NFL dead money data pipeline
+[0m20:22:52.866339 [debug] [MainThread]: Writing injected SQL for node "operation.nfl_dead_money.nfl_dead_money-on-run-start-0"
+[0m20:22:52.868061 [info ] [MainThread]: 1 of 1 START hook: nfl_dead_money.on-run-start.0 ............................... [RUN]
+[0m20:22:52.868266 [info ] [MainThread]: 1 of 1 OK hook: nfl_dead_money.on-run-start.0 .................................. [[32mOK[0m in 0.00s]
+[0m20:22:52.868369 [info ] [MainThread]: 
+[0m20:22:52.868469 [debug] [MainThread]: On master: Close
+[0m20:22:52.869952 [debug] [Thread-1 (]: Began running node seed.nfl_dead_money.spotrac_dead_money
+[0m20:22:52.870181 [info ] [Thread-1 (]: 1 of 1 START seed file main.spotrac_dead_money ................................. [RUN]
+[0m20:22:52.870344 [debug] [Thread-1 (]: Re-using an available connection from the pool (formerly list_nfl_dead_money_main_intermediate, now seed.nfl_dead_money.spotrac_dead_money)
+[0m20:22:52.870447 [debug] [Thread-1 (]: Began compiling node seed.nfl_dead_money.spotrac_dead_money
+[0m20:22:52.870547 [debug] [Thread-1 (]: Began executing node seed.nfl_dead_money.spotrac_dead_money
+[0m20:22:52.881537 [debug] [Thread-1 (]: Using duckdb connection "seed.nfl_dead_money.spotrac_dead_money"
+[0m20:22:52.881687 [debug] [Thread-1 (]: On seed.nfl_dead_money.spotrac_dead_money: BEGIN
+[0m20:22:52.881795 [debug] [Thread-1 (]: Opening a new connection, currently in state closed
+[0m20:22:52.882071 [debug] [Thread-1 (]: SQL status: OK in 0.000 seconds
+[0m20:22:52.882194 [debug] [Thread-1 (]: Using duckdb connection "seed.nfl_dead_money.spotrac_dead_money"
+[0m20:22:52.882305 [debug] [Thread-1 (]: On seed.nfl_dead_money.spotrac_dead_money: /* {"app": "dbt", "dbt_version": "1.10.15", "profile_name": "nfl_dead_money", "target_name": "dev", "node_id": "seed.nfl_dead_money.spotrac_dead_money"} */
+
+    create table "nfl_dead_money"."main"."spotrac_dead_money" ("player_id" text,"player_name" text,"position" text,"team" text,"year" integer,"dead_cap_hit" float8,"is_king" boolean)
+  
+[0m20:22:52.883009 [debug] [Thread-1 (]: SQL status: OK in 0.001 seconds
+[0m20:22:52.887019 [debug] [Thread-1 (]: Using duckdb connection "seed.nfl_dead_money.spotrac_dead_money"
+[0m20:22:52.887138 [debug] [Thread-1 (]: On seed.nfl_dead_money.spotrac_dead_money: 
+          COPY "nfl_dead_money"."main"."spotrac_dead_money" FROM '/Users/andrewsmith/Documents/portfolio/nfl-dead-money/dbt/seeds/spotrac/spotrac_dead_money.csv' (FORMAT CSV, HEADER TRUE, DELIMITER ',')
+        ...
+[0m20:22:52.893181 [debug] [Thread-1 (]: SQL status: OK in 0.006 seconds
+[0m20:22:52.895298 [debug] [Thread-1 (]: Writing runtime SQL for node "seed.nfl_dead_money.spotrac_dead_money"
+[0m20:22:52.899715 [debug] [Thread-1 (]: On seed.nfl_dead_money.spotrac_dead_money: COMMIT
+[0m20:22:52.899848 [debug] [Thread-1 (]: Using duckdb connection "seed.nfl_dead_money.spotrac_dead_money"
+[0m20:22:52.899949 [debug] [Thread-1 (]: On seed.nfl_dead_money.spotrac_dead_money: COMMIT
+[0m20:22:52.900705 [debug] [Thread-1 (]: SQL status: OK in 0.001 seconds
+[0m20:22:52.901358 [debug] [Thread-1 (]: On seed.nfl_dead_money.spotrac_dead_money: Close
+[0m20:22:52.902074 [debug] [Thread-1 (]: Sending event: {'category': 'dbt', 'action': 'run_model', 'label': '465801c5-6cc1-4e8e-9738-f2f4fb975a6e', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10f7ec4d0>]}
+[0m20:22:52.902289 [info ] [Thread-1 (]: 1 of 1 OK loaded seed file main.spotrac_dead_money ............................. [[32mINSERT 181[0m in 0.03s]
+[0m20:22:52.902495 [debug] [Thread-1 (]: Finished running node seed.nfl_dead_money.spotrac_dead_money
+[0m20:22:52.903070 [info ] [MainThread]: 
+[0m20:22:52.903240 [debug] [MainThread]: Using duckdb connection "master"
+[0m20:22:52.903345 [debug] [MainThread]: On master: BEGIN
+[0m20:22:52.903438 [debug] [MainThread]: Opening a new connection, currently in state closed
+[0m20:22:52.903649 [debug] [MainThread]: SQL status: OK in 0.000 seconds
+[0m20:22:52.903740 [debug] [MainThread]: On master: COMMIT
+[0m20:22:52.903825 [debug] [MainThread]: Using duckdb connection "master"
+[0m20:22:52.903905 [debug] [MainThread]: On master: COMMIT
+[0m20:22:52.904050 [debug] [MainThread]: SQL status: OK in 0.000 seconds
+[0m20:22:52.904923 [info ] [MainThread]: Completed dbt run
+[0m20:22:52.905050 [debug] [MainThread]: Writing injected SQL for node "operation.nfl_dead_money.nfl_dead_money-on-run-end-0"
+[0m20:22:52.905230 [info ] [MainThread]: 1 of 1 START hook: nfl_dead_money.on-run-end.0 ................................. [RUN]
+[0m20:22:52.905360 [info ] [MainThread]: 1 of 1 OK hook: nfl_dead_money.on-run-end.0 .................................... [[32mOK[0m in 0.00s]
+[0m20:22:52.905454 [debug] [MainThread]: On master: Close
+[0m20:22:52.905565 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m20:22:52.905639 [debug] [MainThread]: Connection 'seed.nfl_dead_money.spotrac_dead_money' was properly closed.
+[0m20:22:52.905705 [debug] [MainThread]: Connection 'list_nfl_dead_money_main' was properly closed.
+[0m20:22:52.905768 [debug] [MainThread]: Connection 'list_nfl_dead_money_main_staging' was properly closed.
+[0m20:22:52.905830 [debug] [MainThread]: Connection 'list_nfl_dead_money_main_marts' was properly closed.
+[0m20:22:52.905923 [info ] [MainThread]: 
+[0m20:22:52.906012 [info ] [MainThread]: Finished running 2 project hooks, 1 seed in 0 hours 0 minutes and 0.11 seconds (0.11s).
+[0m20:22:52.906272 [debug] [MainThread]: Command end result
+[0m20:22:52.968586 [debug] [MainThread]: Wrote artifact WritableManifest to dbt/target/manifest.json
+[0m20:22:52.969418 [debug] [MainThread]: Wrote artifact SemanticManifest to dbt/target/semantic_manifest.json
+[0m20:22:52.971483 [debug] [MainThread]: Wrote artifact RunExecutionResult to dbt/target/run_results.json
+[0m20:22:52.971590 [info ] [MainThread]: 
+[0m20:22:52.971704 [info ] [MainThread]: [32mCompleted successfully[0m
+[0m20:22:52.971796 [info ] [MainThread]: 
+[0m20:22:52.971908 [info ] [MainThread]: Done. PASS=3 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=3
+[0m20:22:52.973479 [debug] [MainThread]: Resource report: {"command_name": "seed", "command_success": true, "command_wall_clock_time": 0.55885065, "process_in_blocks": "0", "process_kernel_time": 0.170261, "process_mem_max_rss": "175177728", "process_out_blocks": "0", "process_user_time": 1.214611}
+[0m20:22:52.973629 [debug] [MainThread]: Command `dbt seed` succeeded at 20:22:52.973602 after 0.56 seconds
+[0m20:22:52.973749 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10f477ac0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ef367b0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ef36ad0>]}
+[0m20:22:52.973862 [debug] [MainThread]: Flushing usage events
+[0m20:22:54.108884 [debug] [MainThread]: An error was encountered while trying to flush usage events
