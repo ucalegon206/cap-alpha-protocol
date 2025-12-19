@@ -54,6 +54,7 @@ from airflow.operators.bash import BashOperator
 from airflow.models import Variable
 from airflow.exceptions import AirflowException
 import logging
+import os
 
 from src.pipeline_tasks import scrape_rosters, merge_dead_money, run_data_quality
 from src.pipeline_tasks import validate_staging
@@ -67,6 +68,26 @@ logger = logging.getLogger(__name__)
 
 # Project root: parent directory of dags/
 PROJECT_ROOT = str(Path(__file__).parent.parent.absolute())
+
+
+def slack_on_snapshot_complete(**context):
+    """Post to Slack on player rankings snapshot completion."""
+    task_id = context['task'].task_id
+    status = context['task_instance'].state
+    slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
+    if not slack_webhook:
+        logger.info("SLACK_WEBHOOK_URL not set; skipping Slack notification")
+        return
+    
+    try:
+        import requests
+        execution_date = context['execution_date']
+        msg = f":nfl: Player Rankings Snapshot ({execution_date.strftime('%Y-%m-%d')})\n"
+        msg += f"Status: {status}\nTask: {task_id}"
+        requests.post(slack_webhook, json={'text': msg}, timeout=5)
+    except Exception as e:
+        logger.warning(f"Failed to post to Slack: {e}")
+
 
 # TODO: Define configuration
 DEFAULT_ARGS = {
@@ -167,10 +188,10 @@ team_cap_snapshot = BashOperator(
     dag=dag,
 )
 
-# One-time player rankings backfill (2011-2024)
+# Historical backfill (2015-2024) - one-time task, can be triggered manually
 player_rankings_backfill = BashOperator(
-    task_id='snapshot_player_rankings_2011_2024',
-    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/download_spotrac_data.py --snapshot-player-rankings --start-year 2011 --end-year 2024 --method auto',
+    task_id='backfill_player_rankings_2015_2024',
+    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/backfill_player_rankings.py --start-year 2015 --end-year 2024 --delay 30',
     dag=dag,
 )
 dbt_seed = BashOperator(
@@ -191,14 +212,22 @@ dbt_run_marts = BashOperator(
     dag=dag,
 )
 
+data_quality_player_rankings = BashOperator(
+    task_id='validate_player_rankings_quality',
+    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/validate_player_rankings.py --year {{ ds.strftime("%Y") }}',
+    dag=dag,
+)
+
 # Integrate snapshots into pipeline ordering: run snapshots before merge
 player_rankings_weekly = BashOperator(
     task_id='snapshot_player_rankings_weekly',
     bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/player_rankings_snapshot.py --year {{ ds.strftime("%Y") }} --retries 3',
+    on_success_callback=slack_on_snapshot_complete,
+    on_failure_callback=slack_on_snapshot_complete,
     dag=dag,
 )
 
-[team_cap_snapshot, player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> scrape_task
+[team_cap_snapshot, player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> data_quality_player_rankings >> scrape_task
 
 
 if __name__ == "__main__":
