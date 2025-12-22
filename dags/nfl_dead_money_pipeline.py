@@ -60,6 +60,7 @@ from src.pipeline_tasks import scrape_rosters, merge_dead_money, run_data_qualit
 from src.pipeline_tasks import validate_staging
 from src.ingestion import stage_spotrac_team_cap, stage_spotrac_player_rankings, stage_spotrac_dead_money
 from src.normalization import normalize_team_cap, normalize_player_rankings, normalize_dead_money
+from src.dead_money_validator import DeadMoneyValidator
 import os
 from pathlib import Path
 
@@ -86,6 +87,36 @@ def slack_on_snapshot_complete(**context):
         requests.post(slack_webhook, json={'text': msg}, timeout=5)
     except Exception as e:
         logger.warning(f"Failed to post to Slack: {e}")
+
+
+def slack_on_task_failure(context):
+    """Generic Slack alert for task failures."""
+    slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
+    if not slack_webhook:
+        logger.info("SLACK_WEBHOOK_URL not set; skipping Slack failure alert")
+        return
+
+    try:
+        import requests
+        task = context.get('task')
+        ti = context.get('task_instance')
+        dag_id = context.get('dag').dag_id if context.get('dag') else 'unknown_dag'
+        run_id = context.get('run_id', 'unknown_run')
+        execution_date = context.get('execution_date')
+        exception = context.get('exception')
+
+        msg = (
+            f":rotating_light: Airflow Task Failed\n"
+            f"DAG: {dag_id}\n"
+            f"Run: {run_id}\n"
+            f"Task: {task.task_id if task else 'unknown_task'}\n"
+            f"State: {ti.state if ti else 'failed'}\n"
+            f"When: {execution_date.strftime('%Y-%m-%d %H:%M:%S') if execution_date else 'n/a'}\n"
+            f"Error: {str(exception)[:300] if exception else 'unknown error'}"
+        )
+        requests.post(slack_webhook, json={'text': msg}, timeout=5)
+    except Exception as e:
+        logger.warning(f"Failed to post Slack failure alert: {e}")
 
 
 # TODO: Define configuration
@@ -140,38 +171,63 @@ def task_validate_staging(**context):
     validate_staging()
 
 
+def task_validate_dead_money(**context):
+    """Run dead money cross-validation tests (CSV-based)."""
+    validator = DeadMoneyValidator(processed_dir=f"{PROJECT_ROOT}/data/processed/compensation")
+    results = validator.run_all_tests()
+    exit_code = validator.print_summary()
+    
+    # Fail task if any tests failed
+    if exit_code != 0:
+        raise AirflowException("Dead money validation failed - team/player reconciliation mismatch or synthetic data above threshold")
+    
+    return results
+
+
 # Task definitions
 scrape_task = PythonOperator(
     task_id='scrape_rosters',
     python_callable=task_scrape_rosters,
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
 merge_task = PythonOperator(
     task_id='merge_dead_money',
     python_callable=task_merge_dead_money,
-    dag=dag,
-)
-
-validation_task = PythonOperator(
-    task_id='validate_data_quality',
-    python_callable=task_run_data_quality,
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 stage_task = PythonOperator(
     task_id='stage_spotrac_raw_to_staging',
     python_callable=task_stage_spotrac,
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
 staging_validation_task = PythonOperator(
     task_id='validate_staging_tables',
     python_callable=task_validate_staging,
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
 normalize_task = PythonOperator(
     task_id='normalize_staging_to_processed',
+    python_callable=task_normalize_staging,
+    on_failure_callback=slack_on_task_failure,
+    dag=dag,
+)
+
+dead_money_validation_task = PythonOperator(
+    task_id='validate_dead_money_quality',
+    python_callable=task_validate_dead_money,
+    on_failure_callback=slack_on_task_failure,
+    dag=dag,
+)
+
+# Core flow for rosters -> merge -> generic quality tests
+scrape_task >> merge_task >> validation_task
     python_callable=task_normalize_staging,
     dag=dag,
 )
@@ -184,6 +240,7 @@ scrape_task >> merge_task >> validation_task
 team_cap_snapshot = BashOperator(
     task_id='snapshot_spotrac_team_cap',
     bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/download_spotrac_data.py --snapshot-team-cap --year {{{{ ds.strftime("%Y") }}}} --method auto',
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
@@ -191,29 +248,34 @@ team_cap_snapshot = BashOperator(
 player_rankings_backfill = BashOperator(
     task_id='backfill_player_rankings_2015_2024',
     bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/backfill_player_rankings.py --start-year 2015 --end-year 2024 --delay 30',
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 dbt_seed = BashOperator(
     task_id='dbt_seed_spotrac',
     bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt seed --project-dir . --profiles-dir .',
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
 dbt_run_staging = BashOperator(
     task_id='dbt_run_staging',
     bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt run --select staging --project-dir . --profiles-dir .',
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
 dbt_run_marts = BashOperator(
     task_id='dbt_run_marts',
     bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt run --select marts --project-dir . --profiles-dir .',
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
 data_quality_player_rankings = BashOperator(
     task_id='validate_player_rankings_quality',
     bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/validate_player_rankings.py --year {{ ds.strftime("%Y") }}',
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
@@ -223,10 +285,15 @@ player_rankings_weekly = BashOperator(
     bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/player_rankings_snapshot.py --year {{ ds.strftime("%Y") }} --retries 3',
     on_success_callback=slack_on_snapshot_complete,
     on_failure_callback=slack_on_snapshot_complete,
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
-[team_cap_snapshot, player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> data_quality_player_rankings >> scrape_task
+# Temporarily skip team_cap_snapshot for debugging
+# [team_cap_snapshot, player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dead_money_validation_task >> dbt_run_marts >> data_quality_player_rankings >> scrape_task
+
+# Debug: Skip spotrac snapshot, start from player rankings
+[player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dead_money_validation_task >> dbt_run_marts >> data_quality_player_rankings >> scrape_task
 
 
 if __name__ == "__main__":

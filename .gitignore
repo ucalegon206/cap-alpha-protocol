@@ -1,3 +1,21 @@
+# Logs
+*.log
+airflow/
+
+# Generated visualization outputs
+notebooks/outputs/
+dag_visualization/
+
+# OS/editor noise
+.DS_Store
+.vscode/
+
+# Bytecode
+__pycache__/
+*.pyc
+
+# Local envs
+.venv/
 # Python
 __pycache__/
 *.py[cod]
