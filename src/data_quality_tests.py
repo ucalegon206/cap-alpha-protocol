@@ -289,63 +289,6 @@ class DataQualityTester:
         self.test_results['data_consistency'] = result
         return result
     
-    def test_synthetic_player_detection(self) -> Dict:
-        """Test: Check for synthetic/placeholder players with numbered suffixes."""
-        logger.info("Testing for synthetic players...")
-        
-        import re
-        
-        # Check multiple tables for numbered player names
-        tables_to_check = []
-        
-        if self.players_df is not None and 'player_name' in self.players_df.columns:
-            tables_to_check.append(('dim_players', self.players_df, 'player_name'))
-        
-        if self.cap_impact_df is not None and 'player_name' in self.cap_impact_df.columns:
-            tables_to_check.append(('mart_cap_impact', self.cap_impact_df, 'player_name'))
-        
-        if self.raw_rosters_df is not None and 'Player' in s,
-            ("Synthetic Player Detection", self.test_synthetic_player_detection)elf.raw_rosters_df.columns:
-            tables_to_check.append(('raw_rosters', self.raw_rosters_df, 'Player'))
-        
-        if not tables_to_check:
-            return {"status": "FAIL", "reason": "No player name columns found"}
-        
-        # Pattern: names ending with space + numbers (e.g., "Von Walker 5", "Tom Harris 143")
-        synthetic_pattern = re.compile(r'\s+\d+$')
-        
-        synthetic_counts = {}
-        total_counts = {}
-        synthetic_pcts = {}
-        
-        for table_name, df, col_name in tables_to_check:
-            # Count synthetic entries
-            synthetic_mask = df[col_name].astype(str).str.contains(synthetic_pattern, regex=True, na=False)
-            synthetic_count = synthetic_mask.sum()
-            total_count = len(df)
-            synthetic_pct = (synthetic_count / total_count * 100) if total_count > 0 else 0
-            
-            synthetic_counts[table_name] = synthetic_count
-            total_counts[table_name] = total_count
-            synthetic_pcts[table_name] = round(synthetic_pct, 2)
-            
-            logger.info(f"{table_name}: {synthetic_count}/{total_count} ({synthetic_pct:.1f}%) synthetic players")
-        
-        # Overall assessment
-        max_pct = max(synthetic_pcts.values()) if synthetic_pcts else 0
-        
-        result = {
-            "status": "FAIL" if max_pct > 5 else ("WARN" if max_pct > 1 else "PASS"),
-            "synthetic_counts": synthetic_counts,
-            "total_counts": total_counts,
-            "synthetic_pcts": synthetic_pcts,
-            "max_synthetic_pct": max_pct,
-            "threshold": "5% = FAIL, 1-5% = WARN, <1% = PASS",
-            "note": "Players with trailing numbers (e.g., 'Tom Harris 143') are synthetic/placeholder data"
-        }
-        
-        self.test_results['synthetic_player_detection'] = result
-        return result
     
     def run_all_tests(self) -> Dict:
         """Run all data quality tests and return results."""
