@@ -1,0 +1,27 @@
+digraph nfl_dead_money_pipeline {
+	graph [label=nfl_dead_money_pipeline labelloc=t rankdir=LR]
+	backfill_player_rankings_2015_2024 [color="#000000" fillcolor="#f0ede4" label=backfill_player_rankings_2015_2024 shape=rectangle style="filled,rounded"]
+	dbt_run_marts [color="#000000" fillcolor="#f0ede4" label=dbt_run_marts shape=rectangle style="filled,rounded"]
+	dbt_run_staging [color="#000000" fillcolor="#f0ede4" label=dbt_run_staging shape=rectangle style="filled,rounded"]
+	dbt_seed_spotrac [color="#000000" fillcolor="#f0ede4" label=dbt_seed_spotrac shape=rectangle style="filled,rounded"]
+	merge_dead_money [color="#000000" fillcolor="#ffefeb" label=merge_dead_money shape=rectangle style="filled,rounded"]
+	normalize_staging_to_processed [color="#000000" fillcolor="#ffefeb" label=normalize_staging_to_processed shape=rectangle style="filled,rounded"]
+	scrape_rosters [color="#000000" fillcolor="#ffefeb" label=scrape_rosters shape=rectangle style="filled,rounded"]
+	snapshot_player_rankings_weekly [color="#000000" fillcolor="#f0ede4" label=snapshot_player_rankings_weekly shape=rectangle style="filled,rounded"]
+	snapshot_spotrac_team_cap [color="#000000" fillcolor="#f0ede4" label=snapshot_spotrac_team_cap shape=rectangle style="filled,rounded"]
+	stage_spotrac_raw_to_staging [color="#000000" fillcolor="#ffefeb" label=stage_spotrac_raw_to_staging shape=rectangle style="filled,rounded"]
+	validate_data_quality [color="#000000" fillcolor="#ffefeb" label=validate_data_quality shape=rectangle style="filled,rounded"]
+	validate_player_rankings_quality [color="#000000" fillcolor="#f0ede4" label=validate_player_rankings_quality shape=rectangle style="filled,rounded"]
+	validate_staging_tables [color="#000000" fillcolor="#ffefeb" label=validate_staging_tables shape=rectangle style="filled,rounded"]
+	backfill_player_rankings_2015_2024 -> stage_spotrac_raw_to_staging
+	dbt_run_marts -> validate_player_rankings_quality
+	dbt_run_staging -> normalize_staging_to_processed
+	dbt_seed_spotrac -> dbt_run_staging
+	merge_dead_money -> validate_data_quality
+	normalize_staging_to_processed -> dbt_run_marts
+	scrape_rosters -> merge_dead_money
+	snapshot_player_rankings_weekly -> stage_spotrac_raw_to_staging
+	stage_spotrac_raw_to_staging -> validate_staging_tables
+	validate_player_rankings_quality -> scrape_rosters
+	validate_staging_tables -> dbt_seed_spotrac
+}

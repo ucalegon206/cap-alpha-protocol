@@ -1,0 +1,99 @@
+name: Data Quality Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'data/processed/**'
+      - 'requirements.txt'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'data/processed/**'
+      - 'requirements.txt'
+
+jobs:
+  test:
+    name: Run Data Quality Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+    
+    - name: Run pytest tests
+      run: |
+        pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+    
+    - name: Run dead money validator directly
+      run: |
+        python src/dead_money_validator.py
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      continue-on-error: true  # Report but don't block on validator WARN status
+    
+    - name: Upload coverage reports
+      if: always()
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort
+    
+    - name: Check code formatting with black
+      run: black --check src/ tests/ || echo "Run: black src/ tests/"
+      continue-on-error: true
+    
+    - name: Check import sorting with isort
+      run: isort --check-only src/ tests/ || echo "Run: isort src/ tests/"
+      continue-on-error: true
+    
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-code is 0 even if there are style issues
+        flake8 src/ tests/ --count --exit-zero --max-line-length=127 --statistics
+      continue-on-error: true
