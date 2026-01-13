@@ -285,8 +285,16 @@ player_rankings_weekly = BashOperator(
     dag=dag,
 )
 
+# Scrape player salaries for current year
+player_salaries_snapshot = BashOperator(
+    task_id='snapshot_player_salaries',
+    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/scrape_player_salaries.py --year {{{{ ds.strftime("%Y") }}}}',
+    on_failure_callback=slack_on_task_failure,
+    dag=dag,
+)
+
 # Full pipeline dependency chain
-[team_cap_snapshot, player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> dead_money_validation_task >> data_quality_player_rankings >> scrape_task >> merge_task >> data_quality_task
+[team_cap_snapshot, player_rankings_weekly, player_salaries_snapshot, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> dead_money_validation_task >> data_quality_player_rankings >> scrape_task >> merge_task >> data_quality_task
 
 
 if __name__ == "__main__":
