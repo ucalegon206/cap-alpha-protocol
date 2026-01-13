@@ -13,6 +13,8 @@ import time
 from pathlib import Path
 import logging
 import re
+from io import StringIO
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,7 +51,7 @@ def fetch_pfr_tables(url: str, rate_limit: float = 3.0) -> Dict[str, pd.DataFram
         soup = BeautifulSoup(html, 'lxml')
         for tbl in soup.find_all('table'):
             try:
-                df = pd.read_html(str(tbl))[0]
+                df = pd.read_html(StringIO(str(tbl)))[0]
                 tbl_id = tbl.get('id') or f'table_{len(tables)+1}'
                 tables[tbl_id] = df
                 logger.debug(f"Extracted visible table: {tbl_id}")
@@ -62,7 +64,7 @@ def fetch_pfr_tables(url: str, rate_limit: float = 3.0) -> Dict[str, pd.DataFram
             block_soup = BeautifulSoup(block, 'lxml')
             for tbl in block_soup.find_all('table'):
                 try:
-                    df = pd.read_html(str(tbl))[0]
+                    df = pd.read_html(StringIO(str(tbl)))[0]
                     tbl_id = tbl.get('id') or f'comment_table_{len(tables)+1}'
                     if tbl_id not in tables:  # Avoid duplicates
                         tables[tbl_id] = df
@@ -129,7 +131,21 @@ def _extract_team_codes_from_standings(year: int) -> list:
 
 
 
-def scrape_pfr_player_rosters(year: int, save_path: Optional[str] = None) -> pd.DataFrame:
+def _build_run_tags(run_timestamp: Optional[datetime] = None) -> tuple[str, str]:
+    """Return iso-week tag and timestamp strings for consistent filenames."""
+    ts = run_timestamp or datetime.utcnow()
+    iso = ts.isocalendar()
+    iso_week_tag = f"{iso.year}w{iso.week:02d}"
+    timestamp = ts.strftime("%Y%m%d_%H%M%S")
+    return iso_week_tag, timestamp
+
+
+def scrape_pfr_player_rosters(
+    year: int,
+    save_path: Optional[str] = None,
+    run_timestamp: Optional[datetime] = None,
+    iso_week_tag: Optional[str] = None,
+) -> pd.DataFrame:
     """
     Scrape player roster data from Pro Football Reference for all teams.
     
@@ -177,12 +193,19 @@ def scrape_pfr_player_rosters(year: int, save_path: Optional[str] = None) -> pd.
         
         if all_player_data:
             combined_df = pd.concat(all_player_data, ignore_index=True)
-            
-            if save_path:
-                Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-                combined_df.to_csv(save_path, index=False)
-                logger.info(f"Saved {len(combined_df)} player records to {save_path}")
-            
+
+            if not save_path:
+                iso_tag, timestamp = _build_run_tags(run_timestamp)
+                if iso_week_tag:
+                    iso_tag = iso_week_tag
+                save_dir = Path("data/raw/pfr")
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_path = save_dir / f"pfr_rosters_{year}_{iso_tag}_{timestamp}.csv"
+
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            combined_df.to_csv(save_path, index=False)
+            logger.info(f"Saved {len(combined_df)} player records to {save_path}")
+
             return combined_df
         else:
             logger.error("No player data collected")

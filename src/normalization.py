@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 STAGING_DIR = Path("data/staging")
 PROCESSED_DIR = Path("data/processed/compensation")
+PARQUET_DIR = PROCESSED_DIR / "parquet"
 
 TEAM_NAME_TO_CODE = {
     'Arizona Cardinals':'ARI','Atlanta Falcons':'ATL','Baltimore Ravens':'BAL','Buffalo Bills':'BUF',
@@ -26,6 +27,16 @@ TEAM_NAME_TO_CODE = {
     'New York Jets':'NYJ','Philadelphia Eagles':'PHI','Pittsburgh Steelers':'PIT','San Francisco 49ers':'SF',
     'Seattle Seahawks':'SEA','Tampa Bay Buccaneers':'TB','Tennessee Titans':'TEN','Washington Commanders':'WAS'
 }
+
+
+def _write_parquet(df: pd.DataFrame, table: str, year: int) -> None:
+    """Write a Parquet sidecar partitioned by year; skip quietly if engine unavailable."""
+    partition_dir = PARQUET_DIR / table / f"year={year}"
+    partition_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        df.to_parquet(partition_dir / "part-000.parquet", index=False)
+    except Exception as exc:  # tolerate missing pyarrow/fastparquet
+        logger.warning("Parquet write skipped for %s %s: %s", table, year, exc)
 
 
 def _map_team_name(name: str) -> str:
@@ -41,6 +52,7 @@ def normalize_team_cap(year: int) -> Path:
     df['team'] = df['team_name'].apply(_map_team_name)
     out = PROCESSED_DIR / f"stg_team_cap_{year}.csv"
     df.to_csv(out, index=False)
+    _write_parquet(df, "stg_team_cap", year)
     logger.info("Normalized team cap → %s (%d rows)", out, len(df))
     return out
 
@@ -59,6 +71,7 @@ def normalize_player_rankings(year: int) -> Path:
         df = df.merge(players[['player_id','player_key']], on='player_key', how='left')
     out = PROCESSED_DIR / f"stg_player_rankings_{year}.csv"
     df.to_csv(out, index=False)
+    _write_parquet(df, "stg_player_rankings", year)
     logger.info("Normalized player rankings → %s (%d rows)", out, len(df))
     return out
 
@@ -76,5 +89,6 @@ def normalize_dead_money(year: int) -> Path:
         df = df.merge(players[['player_id','player_key']], on='player_key', how='left')
     out = PROCESSED_DIR / f"stg_dead_money_{year}.csv"
     df.to_csv(out, index=False)
+    _write_parquet(df, "stg_dead_money", year)
     logger.info("Normalized dead money → %s (%d rows)", out, len(df))
     return out

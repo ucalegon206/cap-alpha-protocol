@@ -226,15 +226,12 @@ dead_money_validation_task = PythonOperator(
     dag=dag,
 )
 
-# Core flow for rosters -> merge -> generic quality tests
-scrape_task >> merge_task >> validation_task
-    python_callable=task_normalize_staging,
+data_quality_task = PythonOperator(
+    task_id='validate_data_quality',
+    python_callable=task_run_data_quality,
+    on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
-
-
-
-scrape_task >> merge_task >> validation_task
 
 # Weekly Spotrac team cap snapshot (cron via Airflow schedule)
 team_cap_snapshot = BashOperator(
@@ -284,16 +281,12 @@ player_rankings_weekly = BashOperator(
     task_id='snapshot_player_rankings_weekly',
     bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/player_rankings_snapshot.py --year {{ ds.strftime("%Y") }} --retries 3',
     on_success_callback=slack_on_snapshot_complete,
-    on_failure_callback=slack_on_snapshot_complete,
     on_failure_callback=slack_on_task_failure,
     dag=dag,
 )
 
-# Temporarily skip team_cap_snapshot for debugging
-# [team_cap_snapshot, player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dead_money_validation_task >> dbt_run_marts >> data_quality_player_rankings >> scrape_task
-
-# Debug: Skip spotrac snapshot, start from player rankings
-[player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dead_money_validation_task >> dbt_run_marts >> data_quality_player_rankings >> scrape_task
+# Full pipeline dependency chain
+[team_cap_snapshot, player_rankings_weekly, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> dead_money_validation_task >> data_quality_player_rankings >> scrape_task >> merge_task >> data_quality_task
 
 
 if __name__ == "__main__":

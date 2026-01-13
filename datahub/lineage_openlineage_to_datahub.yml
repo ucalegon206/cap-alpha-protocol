@@ -1,0 +1,17 @@
+source:
+  type: openlineage
+  config:
+    server_url: "http://localhost:5000"
+    auth:
+      type: no_auth
+    timeout_sec: 30
+    include_lineage: true
+    include_run_facets: true
+    include_job_facets: true
+
+sink:
+  type: datahub-rest
+  config:
+    server: "http://localhost:8080"
+    token: "${DATAHUB_PAT:-}"
+    timeout_sec: 30

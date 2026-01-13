@@ -16,6 +16,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _build_run_tags(run_timestamp: Optional[datetime] = None) -> tuple[str, str]:
+    """Return iso-week tag and timestamp strings for consistent filenames."""
+    ts = run_timestamp or datetime.utcnow()
+    iso = ts.isocalendar()
+    iso_week_tag = f"{iso.year}w{iso.week:02d}"
+    timestamp = ts.strftime("%Y%m%d_%H%M%S")
+    return iso_week_tag, timestamp
+
+
 class DataQualityError(Exception):
     """Raised when data quality checks fail"""
     pass
@@ -650,7 +659,12 @@ class SpotracScraper:
             logger.info(f"  ✓ Total league cap hit: ${total_cap:.1f}M")
 
 
-def scrape_and_save_team_cap(year: int, output_dir: str = 'data/raw') -> Path:
+def scrape_and_save_team_cap(
+    year: int,
+    output_dir: str = 'data/raw',
+    run_timestamp: Optional[datetime] = None,
+    iso_week_tag: Optional[str] = None,
+) -> Path:
     """
     Scrape team cap data and save to CSV with timestamp.
     
@@ -658,9 +672,11 @@ def scrape_and_save_team_cap(year: int, output_dir: str = 'data/raw') -> Path:
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"spotrac_team_cap_{year}_{timestamp}.csv"
+
+    default_iso, default_ts = _build_run_tags(run_timestamp)
+    if iso_week_tag:
+        default_iso = iso_week_tag
+    filename = f"spotrac_team_cap_{year}_{default_iso}_{default_ts}.csv"
     filepath = output_path / filename
     
     with SpotracScraper(headless=True) as scraper:
@@ -672,7 +688,12 @@ def scrape_and_save_team_cap(year: int, output_dir: str = 'data/raw') -> Path:
     return filepath
 
 
-def scrape_and_save_player_salaries(year: int, output_dir: str = 'data/raw') -> Path:
+def scrape_and_save_player_salaries(
+    year: int,
+    output_dir: str = 'data/raw',
+    run_timestamp: Optional[datetime] = None,
+    iso_week_tag: Optional[str] = None,
+) -> Path:
     """
     Scrape player salary data and save to CSV with timestamp.
     
@@ -680,9 +701,11 @@ def scrape_and_save_player_salaries(year: int, output_dir: str = 'data/raw') -> 
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"spotrac_player_salaries_{year}_{timestamp}.csv"
+
+    default_iso, default_ts = _build_run_tags(run_timestamp)
+    if iso_week_tag:
+        default_iso = iso_week_tag
+    filename = f"spotrac_player_salaries_{year}_{default_iso}_{default_ts}.csv"
     filepath = output_path / filename
     
     with SpotracScraper(headless=True) as scraper:
@@ -694,7 +717,12 @@ def scrape_and_save_player_salaries(year: int, output_dir: str = 'data/raw') -> 
     return filepath
 
 
-def scrape_and_save_player_rankings(year: int, output_dir: str = 'data/raw') -> Path:
+def scrape_and_save_player_rankings(
+    year: int,
+    output_dir: str = 'data/raw',
+    run_timestamp: Optional[datetime] = None,
+    iso_week_tag: Optional[str] = None,
+) -> Path:
     """
     Scrape player rankings (cap hit) data and save to CSV with timestamp.
     
@@ -702,9 +730,11 @@ def scrape_and_save_player_rankings(year: int, output_dir: str = 'data/raw') -> 
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"spotrac_player_rankings_{year}_{timestamp}.csv"
+
+    default_iso, default_ts = _build_run_tags(run_timestamp)
+    if iso_week_tag:
+        default_iso = iso_week_tag
+    filename = f"spotrac_player_rankings_{year}_{default_iso}_{default_ts}.csv"
     filepath = output_path / filename
     
     with SpotracScraper(headless=True) as scraper:
@@ -728,21 +758,22 @@ if __name__ == '__main__':
         sys.exit(1)
     
     command = sys.argv[1]
+    run_timestamp = datetime.utcnow()
     
     try:
         if command == 'team-cap':
             year = int(sys.argv[2])
-            filepath = scrape_and_save_team_cap(year)
+            filepath = scrape_and_save_team_cap(year, run_timestamp=run_timestamp)
             print(f"\n✅ SUCCESS: Team cap data saved to {filepath}")
             
         elif command == 'player-salaries':
             year = int(sys.argv[2])
-            filepath = scrape_and_save_player_salaries(year)
+            filepath = scrape_and_save_player_salaries(year, run_timestamp=run_timestamp)
             print(f"\n✅ SUCCESS: Player salary data saved to {filepath}")
             
         elif command == 'player-rankings':
             year = int(sys.argv[2])
-            filepath = scrape_and_save_player_rankings(year)
+            filepath = scrape_and_save_player_rankings(year, run_timestamp=run_timestamp)
             print(f"\n✅ SUCCESS: Player rankings data saved to {filepath}")
             
         elif command == 'backfill':
@@ -761,7 +792,7 @@ if __name__ == '__main__':
                 
                 try:
                     # Team cap
-                    team_path = scrape_and_save_team_cap(year)
+                    team_path = scrape_and_save_team_cap(year, run_timestamp=run_timestamp)
                     print(f"✓ Team cap: {team_path.name}")
                     success_count += 1
                 except Exception as e:

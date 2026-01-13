@@ -134,6 +134,12 @@ The **NFL Dead Money Pipeline** is a data orchestration system that ingests, tra
 | `roster_contracts` | Enriched roster + contract data | Weekly |
 | `cap_trends` | Year-over-year cap trends | Weekly |
 
+### Parquet Sidecars
+
+- Location: `data/processed/compensation/parquet/{table}/year=YYYY/part-000.parquet`
+- Tables emitted: `stg_team_cap`, `stg_player_rankings`, `stg_dead_money` (CSV remains for compatibility)
+- Notes: Requires `pyarrow` or `fastparquet`; writes are skipped (with warning) if engine is missing.
+
 ---
 
 ## Configuration
@@ -192,6 +198,41 @@ AIRFLOW_HOME=$(pwd)/airflow \
   ./.venv/bin/airflow celery worker -l info \
     --without-gossip --without-mingle --without-heartbeat &
 ```
+
+### Local Lineage/Metadata Quickstart (DataHub + OpenLineage)
+
+1) Start DataHub locally (Docker quickstart):
+
+```bash
+pip install --upgrade datahub && datahub docker quickstart
+# UI: http://localhost:9002
+```
+
+2) Configure OpenLineage env for Airflow/dbt runs:
+
+```bash
+export OPENLINEAGE_URL=http://localhost:5000
+export OPENLINEAGE_NAMESPACE=nfl-dead-money
+```
+
+3) Point DataHub client to local GMS:
+
+```bash
+export DATAHUB_GMS_HOST=localhost
+export DATAHUB_GMS_PORT=8080
+```
+
+4) After `dbt run`/`dbt test`, emit metadata (example):
+
+```bash
+datahub ingest -c datahub/lineage_openlineage_to_datahub.yml
+```
+
+5) Record key datasets for cataloging (DuckDB + Parquet):
+- DuckDB tables: `mart_team_summary`, `mart_player_cap_impact`
+- Parquet sidecars: `stg_team_cap`, `stg_player_rankings`, `stg_dead_money`
+
+Add these env vars to Airflow connections/worker env so DAG tasks emit lineage automatically when OpenLineage hooks are added.
 
 ### Trigger a Run
 

@@ -7,15 +7,20 @@ normalizes to compensation data model, and exports to CSV.
 
 import pandas as pd
 import logging
+from datetime import datetime
 from pathlib import Path
-from src.pfr_scraper import scrape_pfr_player_rosters
+from src.pfr_scraper import _build_run_tags, scrape_pfr_player_rosters
 from src.compensation_model import CompensationDataModel, Player, PlayerContract, PlayerCapImpact
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def scrape_all_years(start_year: int = 2015, end_year: int = 2024, output_dir: str = 'data/processed/compensation') -> CompensationDataModel:
+def scrape_all_years(
+    start_year: int = 2015,
+    end_year: int = 2024,
+    output_dir: str = 'data/processed/compensation',
+) -> CompensationDataModel:
     """
     Scrape and normalize PFR rosters for multiple years into compensation model.
     
@@ -30,13 +35,19 @@ def scrape_all_years(start_year: int = 2015, end_year: int = 2024, output_dir: s
     model = CompensationDataModel()
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    
+
+    run_timestamp = datetime.utcnow()
+    iso_tag, timestamp = _build_run_tags(run_timestamp)
     all_rosters = []
     
     for year in range(start_year, end_year + 1):
         logger.info(f"Scraping rosters for {year}...")
         try:
-            roster_df = scrape_pfr_player_rosters(year=year)
+            roster_df = scrape_pfr_player_rosters(
+                year=year,
+                run_timestamp=run_timestamp,
+                iso_week_tag=iso_tag,
+            )
             
             if roster_df is None or roster_df.empty:
                 logger.warning(f"No roster data for {year}; skipping")
@@ -95,7 +106,7 @@ def scrape_all_years(start_year: int = 2015, end_year: int = 2024, output_dir: s
     # Save raw rosters by year
     if all_rosters:
         combined_rosters = pd.concat(all_rosters, ignore_index=True)
-        rosters_path = output_path / 'raw_rosters_2015_2024.csv'
+        rosters_path = output_path / f"raw_rosters_{start_year}_{end_year}_{iso_tag}_{timestamp}.csv"
         combined_rosters.to_csv(rosters_path, index=False)
         logger.info(f"Saved combined rosters to {rosters_path}")
     
