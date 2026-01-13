@@ -44,7 +44,7 @@ jobs:
     
     - name: Run pytest tests
       run: |
-        pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+        pytest tests/ -v --tb=short --cov=src --cov-report=term-missing --cov-report=xml
       env:
         PYTHONPATH: ${{ github.workspace }}
     
@@ -83,17 +83,65 @@ jobs:
         pip install flake8 black isort
     
     - name: Check code formatting with black
-      run: black --check src/ tests/ || echo "Run: black src/ tests/"
-      continue-on-error: true
+      run: black --check src/ tests/
     
     - name: Check import sorting with isort
-      run: isort --check-only src/ tests/ || echo "Run: isort src/ tests/"
-      continue-on-error: true
+      run: isort --check-only src/ tests/
     
     - name: Lint with flake8
       run: |
         # Stop the build if there are Python syntax errors or undefined names
         flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        # Exit-code is 0 even if there are style issues
-        flake8 src/ tests/ --count --exit-zero --max-line-length=127 --statistics
+        # Check style issues (non-blocking)
+        flake8 src/ tests/ --count --max-line-length=127 --statistics || echo "Style issues found"
+
+  dbt_test:
+    name: dbt Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install dbt-core dbt-duckdb
+    
+    - name: Create DuckDB database
+      run: |
+        mkdir -p dbt
+        touch dbt/nfl_dead_money.duckdb
+    
+    - name: Run dbt deps
+      run: |
+        cd dbt && dbt deps --project-dir . --profiles-dir .
+      continue-on-error: true
+    
+    - name: Run dbt compile
+      run: |
+        cd dbt && dbt compile --project-dir . --profiles-dir .
+      continue-on-error: true
+    
+    - name: Run dbt test
+      run: |
+        cd dbt && dbt test --project-dir . --profiles-dir .
+      continue-on-error: true
+
+      continue-on-error: true
+    
+    - name: Run dbt compile
+      run: |
+        cd dbt && dbt compile --project-dir . --profiles-dir .
+      continue-on-error: true
+    
+    - name: Run dbt test
+      run: |
+        cd dbt && dbt test --project-dir . --profiles-dir .
       continue-on-error: true

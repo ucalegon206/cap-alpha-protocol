@@ -1,4 +1,4 @@
-.PHONY: help test test-verbose test-coverage lint format format-check install-hooks run-hooks clean
+.PHONY: help test test-verbose test-coverage lint format format-check install-hooks run-hooks clean dbt-test dbt-build dbt-docs
 
 help:
 	@echo "NFL Dead Money - Development Commands"
@@ -6,8 +6,13 @@ help:
 	@echo "Testing:"
 	@echo "  make test                 Run all tests"
 	@echo "  make test-verbose         Run tests with verbose output"
-	@echo "  make test-coverage        Run tests with coverage report"
+	@echo "  make test-coverage        Run tests with coverage report (XML + HTML)"
 	@echo "  make test-quick           Run tests excluding slow tests"
+	@echo ""
+	@echo "dbt:"
+	@echo "  make dbt-test             Run dbt tests"
+	@echo "  make dbt-build            Run dbt build (models + tests)"
+	@echo "  make dbt-docs             Generate and serve dbt docs"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make lint                 Run linters (flake8, black, isort)"
@@ -32,7 +37,7 @@ test-verbose:
 	./.venv/bin/pytest tests/ -v
 
 test-coverage:
-	./.venv/bin/pytest tests/ --cov=src --cov-report=html --cov-report=term-missing
+	./.venv/bin/pytest tests/ --cov=src --cov-report=html --cov-report=xml --cov-report=term-missing
 
 test-quick:
 	./.venv/bin/pytest tests/ -m "not slow" -q

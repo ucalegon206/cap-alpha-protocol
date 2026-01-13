@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: stg_player_dead_money
+    description: Staged player-level dead money from processed compensation files
+    columns:
+      - name: player_name
+        description: Player full name
+        tests:
+          - not_null
+      - name: team
+        description: Team code
+        tests:
+          - not_null
+      - name: year
+        description: NFL season year
+        tests:
+          - not_null
+      - name: dead_cap_millions
+        description: Dead cap charge in millions
+        tests:
+          - not_null
+
+  - name: stg_player_rankings
+    description: Staged player cap hit rankings from Spotrac
+    columns:
+      - name: player_name
+        tests:
+          - not_null
+      - name: team
+        tests:
+          - not_null
+      - name: year
+        tests:
+          - not_null
+
+  - name: stg_team_dead_money
+    description: Staged team-level dead money aggregations
+    columns:
+      - name: team
+        tests:
+          - not_null
+      - name: year
+        tests:
+          - not_null
+      - name: dead_money_millions
+        tests:
+          - not_null
+
+  - name: stg_spotrac_dead_money
+    description: Staged Spotrac dead money snapshot
+    columns:
+      - name: player_name
+        tests:
+          - not_null
+      - name: team
+        tests:
+          - not_null
+      - name: year
+        tests:
+          - not_null
+      - name: dead_cap_millions
+        tests:
+          - not_null

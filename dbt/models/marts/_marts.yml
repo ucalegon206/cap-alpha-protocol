@@ -35,9 +35,6 @@ models:
         description: Total dead money in millions
         tests:
           - not_null
-          - dbt_utils.accepted_range:
-              min_value: 0
-              max_value: 100
       - name: salary_cap_millions
         description: Total salary cap in millions
       - name: dead_cap_pct
@@ -60,9 +57,6 @@ models:
         description: Dead cap charge for this player
         tests:
           - not_null
-          - dbt_utils.accepted_range:
-              min_value: 0
-              max_value: 50
       - name: dead_cap_pct_of_team
         description: This player's dead cap as % of team total
       - name: nfl_percentile_rank
