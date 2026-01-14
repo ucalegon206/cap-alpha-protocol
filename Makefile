@@ -8,6 +8,9 @@ help:
 	@echo "  make test-verbose         Run tests with verbose output"
 	@echo "  make test-coverage        Run tests with coverage report (XML + HTML)"
 	@echo "  make test-quick           Run tests excluding slow tests"
+	@echo "  make test-weekly          Run critical tests for weekly pipeline"
+	@echo "  make test-integration     Run integration tests (network required)"
+	@echo "  make test-all             Run ALL tests (unit + integration + slow)"
 	@echo ""
 	@echo "dbt:"
 	@echo "  make dbt-test             Run dbt tests"
@@ -41,6 +44,18 @@ test-coverage:
 
 test-quick:
 	./.venv/bin/pytest tests/ -m "not slow" -q
+
+test-integration:
+	@echo "Running integration tests (requires network)..."
+	./.venv/bin/pytest tests/ -v -m "integration"
+
+test-weekly:
+	@echo "Running critical tests for weekly scheduled pipeline..."
+	./.venv/bin/pytest tests/test_data_freshness.py tests/test_pipeline_idempotency.py tests/test_year_parameterization.py -v
+
+test-all:
+	@echo "Running ALL tests (unit + integration + slow)..."
+	./.venv/bin/pytest tests/ -v
 
 lint:
 	@echo "Running flake8..."
