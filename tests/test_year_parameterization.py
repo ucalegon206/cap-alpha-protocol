@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 class TestFutureYearHandling:
     """Test pipeline behavior with future years."""
+    future_year = datetime.now().year + 2
 
     @pytest.mark.slow
     @pytest.mark.integration
@@ -21,7 +22,7 @@ class TestFutureYearHandling:
         """Test that scraper can accept year 2026+ without crashing."""
         from spotrac_scraper_v2 import SpotracScraper, DataQualityError
         
-        future_year = datetime.now().year + 2
+        future_year = self.future_year
         
         with SpotracScraper(headless=True) as scraper:
             # Should not raise ValueError
@@ -40,7 +41,7 @@ class TestFutureYearHandling:
         """Test normalization with future year parameter."""
         from normalization import normalize_team_cap
         
-        future_year = 2026
+        future_year = self.future_year
         
         # Should not crash even if file doesn't exist
         try:
@@ -54,7 +55,7 @@ class TestFutureYearHandling:
         """Test that salary cap reference handles future years gracefully."""
         from salary_cap_reference import get_official_cap
         
-        future_year = 2026
+        future_year = self.future_year
         
         # Should raise KeyError for missing years (expected)
         with pytest.raises(KeyError):

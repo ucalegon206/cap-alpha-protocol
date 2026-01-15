@@ -65,7 +65,7 @@ PYTHONPATH=. ./.venv/bin/python src/historical_scraper.py                     # 
 ## Key Conventions & Patterns
 
 ### Data Quality Approach
-- **Synthetic Players**: Dataset includes synthetic/placeholder names (e.g., "Von Walker 5").
+- **Synthetic Players**: Dataset includes synthetic/placeholder names (e.g., "Von Walker 5"). Flag with `is_king=False` prefix; **retained by design** (not filtered).
 - **Team vs Player Reconciliation**: `DeadMoneyValidator.test_team_player_reconciliation_csv()` allows ±5% variance (legitimate due to accounting differences).
 - **Salary Cap Reference**: `src/salary_cap_reference.py` hardcodes official NFL caps (2011-2024) for validation. Base cap ≠ Spotrac "Total Cap" (latter includes carryover).
 

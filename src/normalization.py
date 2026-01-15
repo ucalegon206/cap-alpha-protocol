@@ -92,3 +92,34 @@ def normalize_dead_money(year: int) -> Path:
     _write_parquet(df, "stg_dead_money", year)
     logger.info("Normalized dead money → %s (%d rows)", out, len(df))
     return out
+
+def normalize_year_data(year: int) -> None:
+    """Normalize all staging data for a given year"""
+    logger.info(f"Normalizing data for {year}")
+    
+    normalize_team_cap(year)
+    normalize_player_rankings(year)
+    normalize_dead_money(year)
+    
+    logger.info(f"✓ Normalization complete for {year}")
+
+
+def main():
+    """CLI interface"""
+    import argparse
+    import sys
+    
+    parser = argparse.ArgumentParser(description='Normalize staging data to processed layer')
+    parser.add_argument('--year', type=int, required=True, help='Year to process')
+    
+    args = parser.parse_args()
+    
+    try:
+        normalize_year_data(args.year)
+    except Exception as e:
+        logger.error(f"✗ Normalization failed: {e}")
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

@@ -188,8 +188,23 @@ def merge_historical_dead_money(model: CompensationDataModel, dead_money_csv: st
 
 
 if __name__ == '__main__':
-    # Scrape 2015-2024
-    model = scrape_all_years(start_year=2015, end_year=2024)
+    import sys
+    import argparse
     
-    # Optional: merge historical dead money if CSV exists
-    # merge_historical_dead_money(model, 'data/raw/historical_dead_money.csv')
+    parser = argparse.ArgumentParser(description='Scrape PFR rosters for specified years')
+    parser.add_argument('--start-year', type=int, default=2015, help='First year to scrape (default 2015)')
+    parser.add_argument('--end-year', type=int, default=None, help='Last year to scrape inclusive (default: current year)')
+    parser.add_argument('--year', type=int, default=None, help='Single year (overrides start/end)')
+    parser.add_argument('--output-dir', type=str, default='data/processed/compensation', help='Output directory')
+    
+    args = parser.parse_args()
+    
+    # Handle single year
+    if args.year:
+        start = end = args.year
+    else:
+        start = args.start_year
+        end = args.end_year or datetime.now().year
+    
+    logger.info(f"Scraping rosters for years {start}-{end}...")
+    model = scrape_all_years(start_year=start, end_year=end, output_dir=args.output_dir)

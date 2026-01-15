@@ -119,3 +119,33 @@ def _latest_snapshot_suffix(year: int) -> str:
     if not files:
         return ""
     return Path(sorted(files)[-1]).stem.split(f"spotrac_team_cap_{year}_")[-1]
+
+def main():
+    """CLI interface for ingestion"""
+    import argparse
+    import sys
+    
+    parser = argparse.ArgumentParser(description='Load raw data into staging layer')
+    parser.add_argument('--source', required=True,
+                       choices=['spotrac-team-cap', 'pfr-rosters', 'spotrac-rankings'],
+                       help='Data source to stage')
+    parser.add_argument('--year', type=int, required=True, help='Year to process')
+    
+    args = parser.parse_args()
+    
+    try:
+        if args.source == 'spotrac-team-cap':
+            stage_spotrac_team_cap(args.year)
+        elif args.source == 'pfr-rosters':
+            stage_spotrac_player_rankings(args.year)
+        elif args.source == 'spotrac-rankings':
+            stage_spotrac_dead_money(args.year)
+        
+        logger.info(f"✓ Ingestion complete for {args.source} ({args.year})")
+    except Exception as e:
+        logger.error(f"✗ Ingestion failed: {e}")
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

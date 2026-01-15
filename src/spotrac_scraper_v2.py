@@ -176,8 +176,23 @@ class SpotracScraper:
             
         logger.info(f"  ✓ Extracted {len(rows)} team records")
         
-        # Build DataFrame
-        df = pd.DataFrame(rows, columns=headers[:len(rows[0])])
+        # Build DataFrame with header deduplication
+        # Handle case where DataFrame has duplicate column names
+        col_count = len(rows[0]) if rows else len(headers)
+        headers_to_use = headers[:col_count]
+        
+        # Deduplicate column names by appending suffixes
+        seen = {}
+        dedup_headers = []
+        for col in headers_to_use:
+            if col in seen:
+                seen[col] += 1
+                dedup_headers.append(f"{col}_{seen[col]}")
+            else:
+                seen[col] = 0
+                dedup_headers.append(col)
+        
+        df = pd.DataFrame(rows, columns=dedup_headers)
         
         # TRANSFORMATION: Normalize columns
         df = self._normalize_team_cap_df(df, year)
@@ -191,10 +206,11 @@ class SpotracScraper:
     def _normalize_team_cap_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
         """Normalize column names and parse monetary values"""
         
-        # Rename columns to standard names (handle multiline headers)
+        # Rename columns to standard names (handle multiline headers and suffixes)
         col_map = {}
         for col in df.columns:
-            col_lower = col.lower()
+            col_clean = col.split('_')[0] if '_' in col and col.split('_')[-1].isdigit() else col
+            col_lower = col_clean.lower()
             if 'team' in col_lower and 'avg' not in col_lower:
                 col_map[col] = 'team'
             elif 'active' in col_lower and '53' in col_lower:
@@ -207,6 +223,9 @@ class SpotracScraper:
                 col_map[col] = 'cap_space'
                 
         df = df.rename(columns=col_map)
+        
+        # Remove any remaining duplicate columns (keep first occurrence)
+        df = df.loc[:, ~df.columns.duplicated(keep='first')]
         
         # Parse money columns
         money_cols = ['active_cap', 'dead_money', 'total_cap', 'cap_space']
@@ -221,10 +240,11 @@ class SpotracScraper:
         if 'dead_money_millions' in df.columns and 'total_cap_millions' in df.columns:
             df['dead_cap_pct'] = (df['dead_money_millions'] / df['total_cap_millions'] * 100).round(2)
             
-        # Keep only normalized columns
+        # Keep only normalized columns - use filter to avoid duplicate column issues
         keep_cols = ['team', 'year', 'active_cap_millions', 'dead_money_millions', 
                      'total_cap_millions', 'cap_space_millions', 'dead_cap_pct']
-        df = df[[c for c in keep_cols if c in df.columns]]
+        available_cols = [c for c in keep_cols if c in df.columns]
+        df = df[available_cols]
         
         return df
         

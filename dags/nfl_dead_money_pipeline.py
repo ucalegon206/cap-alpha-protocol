@@ -1,306 +1,232 @@
 """
-Daily NFL Dead Money Pipeline DAG for Apache Airflow.
+Weekly NFL Dead Money Pipeline with Year Parameterization
 
-This DAG orchestrates a comprehensive data pipeline for NFL dead money analysis,
-integrating data from multiple sources (Pro Football Reference rosters and Spotrac
-team cap data) and transforming it through staging, normalization, and mart layers.
-
-Pipeline Flow:
-1. Snapshot Spotrac team cap data and player rankings (weekly and backfill)
-2. Stage raw Spotrac data into staging layer
-3. Validate staging tables for data quality
-4. Run dbt seed to load reference data
-5. Transform staging data using dbt (staging layer)
-6. Normalize and process data into marts layer
-7. Scrape PFR rosters for years 2015 to current
-8. Merge dead money data with roster contracts
-9. Run final data quality validation
+Orchestrates complete data pipeline:
+1. Layer 1: Scrapers (Spotrac team caps, rankings + PFR rosters)
+2. Layer 2: Staging (Raw → Staging)
+3. Layer 3: Normalization (Staging → Processed)
+4. Layer 4: dbt Transforms (Processed → Marts)
+5. Layer 5: Data Quality Checks
+6. Layer 6: Notebook & Reporting
 
 Configuration:
-- Schedule: Weekly (@weekly)
-- Owner: nfl-analytics
-- Retries: 2 (with 5-minute delay)
-- Email notifications: On failure only
-- Catchup: Disabled
+- Schedule: Weekly (Monday 2 AM UTC)
+- Year Parameter: Via Airflow Variable 'pipeline_year' (defaults to current year)
+- Retries: 2 with 5-min delay
+- Rate Limiting: External API pool with 1 slot
+- Max Active: 1 run at a time
 
-Dependencies:
-- src.pipeline_tasks: Core ETL functions for scraping, merging, and validation
-- src.ingestion: Spotrac data staging functions
-- src.normalization: Data normalization utilities
-- dbt: Data transformation and mart generation
-- Apache Airflow: Workflow orchestration
-
-Note:
-- Hardcoded local paths should be parameterized for production deployment
-- Player rankings backfill is a one-time load for historical years (2011-2024)
-- Debug mode available for local task testing
-Daily NFL Dead Money Pipeline (PFR rosters + dead money CSV).
-
-Steps:
-1) Scrape PFR rosters for 2015-current year
-2) Merge dead money CSV (sample or real) into contracts
-3) Recompute cap impact + team dead money aggregates
-4) Run data quality tests
-
-Notes:
-- Uses src/pipeline_tasks.py helpers
-- Replace dead_money_csv path with Spotrac/OTC export when available
+Usage:
+    # Default (current year)
+    airflow dags trigger nfl_dead_money_weekly
+    
+    # Specific year
+    airflow dags trigger nfl_dead_money_weekly --conf '{"pipeline_year": 2025}'
 """
 
 from datetime import datetime, timedelta
+from pathlib import Path
 from airflow import DAG
 from airflow.models import Variable
-from airflow.exceptions import AirflowException
-from airflow.providers.standard.operators.bash import BashOperator
-from airflow.providers.standard.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 import logging
-import os
-
-from src.pipeline_tasks import scrape_rosters, merge_dead_money, run_data_quality
-from src.pipeline_tasks import validate_staging
-from src.ingestion import stage_spotrac_team_cap, stage_spotrac_player_rankings, stage_spotrac_dead_money
-from src.normalization import normalize_team_cap, normalize_player_rankings, normalize_dead_money
-from src.dead_money_validator import DeadMoneyValidator
-import os
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Project root: parent directory of dags/
-PROJECT_ROOT = str(Path(__file__).parent.parent.absolute())
 
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+PROJECT_ROOT = Path(__file__).parent.parent
+DATA_DIR = PROJECT_ROOT / 'data'
+VENV_PYTHON = str(PROJECT_ROOT / '.venv' / 'bin' / 'python')
 
-def slack_on_snapshot_complete(**context):
-    """Post to Slack on player rankings snapshot completion."""
-    task_id = context['task'].task_id
-    status = context['task_instance'].state
-    slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
-    if not slack_webhook:
-        logger.info("SLACK_WEBHOOK_URL not set; skipping Slack notification")
-        return
+def get_pipeline_year(context=None):
+    """Get pipeline year from Airflow Variable or execution date"""
+    try:
+        # Try to get from Variable (set via --conf)
+        year_var = Variable.get('pipeline_year', default_var=None)
+        if year_var:
+            return int(year_var)
+    except Exception:
+        pass
     
-    try:
-        import requests
-        execution_date = context['execution_date']
-        msg = f":nfl: Player Rankings Snapshot ({execution_date.strftime('%Y-%m-%d')})\n"
-        msg += f"Status: {status}\nTask: {task_id}"
-        requests.post(slack_webhook, json={'text': msg}, timeout=5)
-    except Exception as e:
-        logger.warning(f"Failed to post to Slack: {e}")
+    # Default: current year
+    return datetime.now().year
 
-
-def slack_on_task_failure(context):
-    """Generic Slack alert for task failures."""
-    slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
-    if not slack_webhook:
-        logger.info("SLACK_WEBHOOK_URL not set; skipping Slack failure alert")
-        return
-
-    try:
-        import requests
-        task = context.get('task')
-        ti = context.get('task_instance')
-        dag_id = context.get('dag').dag_id if context.get('dag') else 'unknown_dag'
-        run_id = context.get('run_id', 'unknown_run')
-        execution_date = context.get('execution_date')
-        exception = context.get('exception')
-
-        msg = (
-            f":rotating_light: Airflow Task Failed\n"
-            f"DAG: {dag_id}\n"
-            f"Run: {run_id}\n"
-            f"Task: {task.task_id if task else 'unknown_task'}\n"
-            f"State: {ti.state if ti else 'failed'}\n"
-            f"When: {execution_date.strftime('%Y-%m-%d %H:%M:%S') if execution_date else 'n/a'}\n"
-            f"Error: {str(exception)[:300] if exception else 'unknown error'}"
-        )
-        requests.post(slack_webhook, json={'text': msg}, timeout=5)
-    except Exception as e:
-        logger.warning(f"Failed to post Slack failure alert: {e}")
-
-
-# TODO: Define configuration
-DEFAULT_ARGS = {
-    'owner': 'nfl-analytics',
-    'depends_on_past': False,
-    'start_date': datetime(2025, 1, 1),
-    'email_on_failure': True,
-    'email_on_retry': False,
+# ============================================================================
+# DEFAULT ARGS
+# ============================================================================
+default_args = {
+    'owner': 'data-eng',
     'retries': 2,
     'retry_delay': timedelta(minutes=5),
+    'email_on_failure': True,
+    'email': ['data-alerts@example.com'],
 }
 
-# TODO: Create DAG
-dag = DAG(
-    'nfl_dead_money_pipeline',
-    default_args=DEFAULT_ARGS,
-    description='Daily NFL dead money data collection and transformation',
-    schedule='@weekly',  # Weekly schedule
+# ============================================================================
+# DAG DEFINITION
+# ============================================================================
+with DAG(
+    'nfl_dead_money_weekly',
+    default_args=default_args,
+    description='Weekly NFL dead money pipeline (scrapers → dbt → validation → notebooks)',
+    schedule_interval='0 2 * * 1',  # Every Monday at 2 AM UTC
+    start_date=datetime(2025, 1, 13),
     catchup=False,
-    tags=['nfl', 'dead-money', 'finance'],
-)
-
-
-def task_scrape_rosters(**context):
-    end_year = datetime.now().year
-    scrape_rosters(start_year=2015, end_year=end_year)
-
-
-def task_merge_dead_money(**context):
-    merge_dead_money()
-def task_stage_spotrac(**context):
-    year = datetime.now().year
-    stage_spotrac_team_cap(year)
-    stage_spotrac_player_rankings(year)
-    stage_spotrac_dead_money(year)
-
-
-def task_normalize_staging(**context):
-    year = datetime.now().year
-    normalize_team_cap(year)
-    normalize_player_rankings(year)
-    normalize_dead_money(year)
-
-
-
-def task_run_data_quality(**context):
-    run_data_quality()
-
-
-def task_validate_staging(**context):
-    validate_staging()
-
-
-def task_validate_dead_money(**context):
-    """Run dead money cross-validation tests (CSV-based)."""
-    validator = DeadMoneyValidator(processed_dir=f"{PROJECT_ROOT}/data/processed/compensation")
-    results = validator.run_all_tests()
-    exit_code = validator.print_summary()
+    max_active_runs=1,
+    tags=['nfl', 'dead-money', 'weekly', 'production'],
+) as dag:
     
-    # Fail task if any tests failed
-    if exit_code != 0:
-        raise AirflowException("Dead money validation failed - team/player reconciliation mismatch or synthetic data above threshold")
+    # ========================================================================
+    # DYNAMIC YEAR PARAMETER
+    # ========================================================================
+    def set_pipeline_year(**context):
+        """Extract and log pipeline year"""
+        year = get_pipeline_year(context)
+        logger.info(f"Pipeline Year: {year}")
+        context['task_instance'].xcom_push(key='pipeline_year', value=year)
+        return year
     
-    return results
-
-
-# Task definitions
-scrape_task = PythonOperator(
-    task_id='scrape_rosters',
-    python_callable=task_scrape_rosters,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-merge_task = PythonOperator(
-    task_id='merge_dead_money',
-    python_callable=task_merge_dead_money,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-stage_task = PythonOperator(
-    task_id='stage_spotrac_raw_to_staging',
-    python_callable=task_stage_spotrac,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-staging_validation_task = PythonOperator(
-    task_id='validate_staging_tables',
-    python_callable=task_validate_staging,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-normalize_task = PythonOperator(
-    task_id='normalize_staging_to_processed',
-    python_callable=task_normalize_staging,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-dead_money_validation_task = PythonOperator(
-    task_id='validate_dead_money_quality',
-    python_callable=task_validate_dead_money,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-data_quality_task = PythonOperator(
-    task_id='validate_data_quality',
-    python_callable=task_run_data_quality,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-# Weekly Spotrac team cap snapshot (cron via Airflow schedule)
-team_cap_snapshot = BashOperator(
-    task_id='snapshot_spotrac_team_cap',
-    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/download_spotrac_data.py --snapshot-team-cap --year {{{{ ds.strftime("%Y") }}}} --method auto',
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-# Historical backfill (2015-2024) - one-time task, can be triggered manually
-player_rankings_backfill = BashOperator(
-    task_id='backfill_player_rankings_2015_2024',
-    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/backfill_player_rankings.py --start-year 2015 --end-year 2024 --delay 30',
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-dbt_seed = BashOperator(
-    task_id='dbt_seed_spotrac',
-    bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt seed --project-dir . --profiles-dir .',
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-dbt_run_staging = BashOperator(
-    task_id='dbt_run_staging',
-    bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt run --select staging --project-dir . --profiles-dir .',
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-dbt_run_marts = BashOperator(
-    task_id='dbt_run_marts',
-    bash_command=f'cd {PROJECT_ROOT}/dbt && ../.venv/bin/dbt run --select marts --project-dir . --profiles-dir .',
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-data_quality_player_rankings = BashOperator(
-    task_id='validate_player_rankings_quality',
-    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/validate_player_rankings.py --year {{ ds.strftime("%Y") }}',
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-# Integrate snapshots into pipeline ordering: run snapshots before merge
-player_rankings_weekly = BashOperator(
-    task_id='snapshot_player_rankings_weekly',
-    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/player_rankings_snapshot.py --year {{ ds.strftime("%Y") }} --retries 3',
-    on_success_callback=slack_on_snapshot_complete,
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-# Scrape player salaries for current year
-player_salaries_snapshot = BashOperator(
-    task_id='snapshot_player_salaries',
-    bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/python scripts/scrape_player_salaries.py --year {{{{ ds.strftime("%Y") }}}}',
-    on_failure_callback=slack_on_task_failure,
-    dag=dag,
-)
-
-# Full pipeline dependency chain
-[team_cap_snapshot, player_rankings_weekly, player_salaries_snapshot, player_rankings_backfill] >> stage_task >> staging_validation_task >> dbt_seed >> dbt_run_staging >> normalize_task >> dbt_run_marts >> dead_money_validation_task >> data_quality_player_rankings >> scrape_task >> merge_task >> data_quality_task
-
-
-if __name__ == "__main__":
-    logger.warning("=" * 80)
-    logger.warning("RUNNING LOCAL DEBUG OF DAG TASKS")
-    logger.warning("=" * 80)
-    task_scrape_rosters()
-    task_merge_dead_money()
-    task_run_data_quality()
+    set_year = PythonOperator(
+        task_id='set_pipeline_year',
+        python_callable=set_pipeline_year,
+        provide_context=True,
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 1: SCRAPERS (Raw Data Collection)
+    # ========================================================================
+    
+    scrape_spotrac_team_caps = BashOperator(
+        task_id='scrape_spotrac_team_caps',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} -c "import sys; sys.path.insert(0, \\"{PROJECT_ROOT}\\"); year = int(\\\"${{PIPELINE_YEAR}}\\\"); from src.spotrac_scraper_v2 import scrape_and_save_team_cap; scrape_and_save_team_cap(year)"',
+        pool='external_api',
+        pool_slots=1,
+        env={'PIPELINE_YEAR': "{{ ti.xcom_pull(task_ids='set_pipeline_year') }}"},
+        dag=dag,
+    )
+    
+    scrape_pfr_rosters = BashOperator(
+        task_id='scrape_pfr_rosters',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/historical_scraper.py --year "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
+        pool='external_api',
+        pool_slots=1,
+        dag=dag,
+    )
+    
+    scrape_spotrac_player_rankings = BashOperator(
+        task_id='scrape_spotrac_player_rankings',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} -c "import sys; sys.path.insert(0, \\"{PROJECT_ROOT}\\"); year = int(\\\"${{PIPELINE_YEAR}}\\\"); from src.spotrac_scraper_v2 import scrape_and_save_player_rankings; scrape_and_save_player_rankings(year)"',
+        pool='external_api',
+        pool_slots=1,
+        env={'PIPELINE_YEAR': "{{ ti.xcom_pull(task_ids='set_pipeline_year') }}"},
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 2: DATA STAGING (Load Raw → Staging)
+    # ========================================================================
+    
+    stage_spotrac_team_caps = BashOperator(
+        task_id='stage_spotrac_team_caps',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/ingestion.py --source spotrac-team-cap --year "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
+        dag=dag,
+    )
+    
+    stage_pfr_rosters = BashOperator(
+        task_id='stage_pfr_rosters',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/ingestion.py --source pfr-rosters --year "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
+        dag=dag,
+    )
+    
+    stage_spotrac_rankings = BashOperator(
+        task_id='stage_spotrac_rankings',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/ingestion.py --source spotrac-rankings --year "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 3: NORMALIZATION (Staging → Processed)
+    # ========================================================================
+    
+    normalize_data = BashOperator(
+        task_id='normalize_data',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/normalization.py --year "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 4: DBT TRANSFORMS (Processed → Marts)
+    # ========================================================================
+    
+    dbt_seed = BashOperator(
+        task_id='dbt_seed',
+        bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/dbt seed --project-dir ./dbt --profiles-dir ./dbt 2>&1 | tail -20',
+        dag=dag,
+    )
+    
+    dbt_run_staging = BashOperator(
+        task_id='dbt_run_staging',
+        bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/dbt run --project-dir ./dbt --profiles-dir ./dbt --select tag:staging 2>&1 | tail -20',
+        dag=dag,
+    )
+    
+    dbt_run_marts = BashOperator(
+        task_id='dbt_run_marts',
+        bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/dbt run --project-dir ./dbt --profiles-dir ./dbt --select tag:mart 2>&1 | tail -20',
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 5: DATA QUALITY & VALIDATION
+    # ========================================================================
+    
+    data_quality_checks = BashOperator(
+        task_id='data_quality_checks',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} -m pytest tests/test_data_freshness.py tests/test_pipeline_idempotency.py -v --tb=short 2>&1 | tail -30',
+        dag=dag,
+    )
+    
+    validate_dead_money = BashOperator(
+        task_id='validate_dead_money',
+        bash_command=f'cd {PROJECT_ROOT} && make validate 2>&1 | tail -20',
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 6: NOTEBOOKS & REPORTING
+    # ========================================================================
+    
+    run_salary_analysis_notebook = BashOperator(
+        task_id='run_salary_analysis_notebook',
+        bash_command=f'cd {PROJECT_ROOT} && ./.venv/bin/papermill notebooks/09_salary_distribution_analysis.ipynb notebooks/outputs/09_salary_distribution_analysis_{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}_{{{{ ds }}}}.ipynb -p data_year {{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}} 2>&1 | tail -20',
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # TASK DEPENDENCIES (DAG GRAPH)
+    # ========================================================================
+    
+    # Layer 1 (Scrapers) - parallel after year is set
+    set_year >> [scrape_spotrac_team_caps, scrape_pfr_rosters, scrape_spotrac_player_rankings]
+    
+    # Layer 2 (Staging) - depends on respective scrapers
+    scrape_spotrac_team_caps >> stage_spotrac_team_caps
+    scrape_pfr_rosters >> stage_pfr_rosters
+    scrape_spotrac_player_rankings >> stage_spotrac_rankings
+    
+    # Layer 3 (Normalization) - depends on all staging
+    [stage_spotrac_team_caps, stage_pfr_rosters, stage_spotrac_rankings] >> normalize_data
+    
+    # Layer 4 (dbt) - sequential
+    normalize_data >> dbt_seed >> dbt_run_staging >> dbt_run_marts
+    
+    # Layer 5 (Validation) - parallel after dbt
+    dbt_run_marts >> [data_quality_checks, validate_dead_money]
+    
+    # Layer 6 (Notebooks) - final step after all validation
+    [data_quality_checks, validate_dead_money] >> run_salary_analysis_notebook

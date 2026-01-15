@@ -1,0 +1,11 @@
+
+    
+    
+    truncate table "nfl_dead_money"."main"."spotrac_team_cap_2025";
+    -- dbt seed --
+    
+          COPY "nfl_dead_money"."main"."spotrac_team_cap_2025" FROM './seeds/spotrac_team_cap_2025.csv' (FORMAT CSV, HEADER TRUE, DELIMITER ',')
+        
+
+;
+  

@@ -79,6 +79,15 @@ install-hooks:
 run-hooks:
 	./.venv/bin/pre-commit run --all-files
 
+dbt-test:
+	cd dbt && ../.venv/bin/dbt test --profiles-dir . --project-dir .
+
+dbt-build:
+	cd dbt && ../.venv/bin/dbt build --profiles-dir . --project-dir .
+
+dbt-docs:
+	cd dbt && ../.venv/bin/dbt docs generate --profiles-dir . --project-dir .
+
 validate:
 	./.venv/bin/python src/dead_money_validator.py
 
