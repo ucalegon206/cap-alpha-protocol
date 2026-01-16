@@ -18,18 +18,18 @@ Configuration:
 
 Usage:
     # Default (current year)
-    airflow dags trigger nfl_dead_money_weekly
+    airflow dags trigger nfl_dead_money_pipeline
     
     # Specific year
-    airflow dags trigger nfl_dead_money_weekly --conf '{"pipeline_year": 2025}'
+    airflow dags trigger nfl_dead_money_pipeline --conf '{"pipeline_year": 2025}'
 """
 
 from datetime import datetime, timedelta
 from pathlib import Path
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.bash import BashOperator
+from airflow.providers.standard.operators.python import PythonOperator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,10 +70,10 @@ default_args = {
 # DAG DEFINITION
 # ============================================================================
 with DAG(
-    'nfl_dead_money_weekly',
+    'nfl_dead_money_pipeline',
     default_args=default_args,
     description='Weekly NFL dead money pipeline (scrapers → dbt → validation → notebooks)',
-    schedule_interval='0 2 * * 1',  # Every Monday at 2 AM UTC
+    schedule='0 2 * * 1',  # Every Monday at 2 AM UTC
     start_date=datetime(2025, 1, 13),
     catchup=False,
     max_active_runs=1,
@@ -93,7 +93,6 @@ with DAG(
     set_year = PythonOperator(
         task_id='set_pipeline_year',
         python_callable=set_pipeline_year,
-        provide_context=True,
         dag=dag,
     )
     
