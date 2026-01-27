@@ -120,6 +120,64 @@ def _latest_snapshot_suffix(year: int) -> str:
         return ""
     return Path(sorted(files)[-1]).stem.split(f"spotrac_team_cap_{year}_")[-1]
 
+
+def stage_player_contracts(year: int, snapshot_date: Optional[str] = None) -> Path:
+    """Normalize and stage Spotrac player contracts for given year."""
+    # Find most recent contract file for year (matches curated, test, or scraped variants)
+    import glob
+    files = glob.glob(str(RAW_DIR / f"*player_contracts_{year}*.csv"))
+    files += glob.glob(str(RAW_DIR / f"*contracts_{year}*.csv"))
+    
+    if not files:
+        logger.warning("Player contracts raw file not found for year %d", year)
+        return Path()
+    
+    # Prefer "full" or "comprehensive" files over test files
+    full_files = [f for f in files if 'full' in f.lower() or 'comprehensive' in f.lower()]
+    if full_files:
+        raw_path = Path(sorted(full_files)[-1])
+    else:
+        raw_path = Path(sorted(files)[-1])  # Fallback to most recent
+    
+    logger.info(f"  Using: {raw_path.name}")
+    df = pd.read_csv(raw_path)
+    
+    # Normalize columns
+    col_map = {
+        'player_name': 'player_name',
+        'team': 'team',
+        'position': 'position',
+        'year': 'year',
+        'total_contract_value_millions': 'total_contract_value_millions',
+        'guaranteed_money_millions': 'guaranteed_money_millions',
+        'signing_bonus_millions': 'signing_bonus_millions',
+        'contract_length_years': 'contract_length_years',
+        'years_remaining': 'years_remaining',
+        'cap_hit_millions': 'cap_hit_millions',
+        'dead_cap_millions': 'dead_cap_millions',
+    }
+    df.columns = [c.strip().lower() for c in df.columns]
+    df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+    
+    # Type conversions
+    for col in ['total_contract_value_millions', 'guaranteed_money_millions', 'signing_bonus_millions', 'cap_hit_millions', 'dead_cap_millions']:
+        if col in df.columns:
+            df[col] = df[col].apply(_to_float)
+    
+    for col in ['contract_length_years', 'years_remaining']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('int64')
+    
+    if 'year' in df.columns:
+        df['year'] = pd.to_numeric(df['year'], errors='coerce').fillna(2024).astype('int64')
+    else:
+        df['year'] = year
+    
+    out_path = STAGING_DIR / f"stg_spotrac_player_contracts_{year}.csv"
+    df.to_csv(out_path, index=False)
+    logger.info("Staged player contracts: %s (%d rows)", out_path, len(df))
+    return out_path
+
 def main():
     """CLI interface for ingestion"""
     import argparse
@@ -127,7 +185,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='Load raw data into staging layer')
     parser.add_argument('--source', required=True,
-                       choices=['spotrac-team-cap', 'pfr-rosters', 'spotrac-rankings'],
+                       choices=['spotrac-team-cap', 'pfr-rosters', 'spotrac-rankings', 'spotrac-contracts'],
                        help='Data source to stage')
     parser.add_argument('--year', type=int, required=True, help='Year to process')
     
@@ -140,6 +198,8 @@ def main():
             stage_spotrac_player_rankings(args.year)
         elif args.source == 'spotrac-rankings':
             stage_spotrac_dead_money(args.year)
+        elif args.source == 'spotrac-contracts':
+            stage_player_contracts(args.year)
         
         logger.info(f"✓ Ingestion complete for {args.source} ({args.year})")
     except Exception as e:

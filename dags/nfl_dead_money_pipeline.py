@@ -100,6 +100,15 @@ with DAG(
     # LAYER 1: SCRAPERS (Raw Data Collection)
     # ========================================================================
     
+    # Generate curated contract dataset (idempotent - creates if missing)
+    generate_curated_contracts = BashOperator(
+        task_id='generate_curated_contracts',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/generate_2024_curated_full.py 2>&1 | tail -20',
+        pool='external_api',
+        pool_slots=1,
+        dag=dag,
+    )
+    
     scrape_spotrac_team_caps = BashOperator(
         task_id='scrape_spotrac_team_caps',
         bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} -c "import sys; sys.path.insert(0, \\"{PROJECT_ROOT}\\"); year = int(\\\"${{PIPELINE_YEAR}}\\\"); from src.spotrac_scraper_v2 import scrape_and_save_team_cap; scrape_and_save_team_cap(year)"',
@@ -148,6 +157,12 @@ with DAG(
         dag=dag,
     )
     
+    stage_spotrac_contracts = BashOperator(
+        task_id='stage_spotrac_contracts',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/ingestion.py --source spotrac-contracts --year "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
+        dag=dag,
+    )
+    
     # ========================================================================
     # LAYER 3: NORMALIZATION (Staging → Processed)
     # ========================================================================
@@ -155,6 +170,16 @@ with DAG(
     normalize_data = BashOperator(
         task_id='normalize_data',
         bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/normalization.py --year "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 3.5: LOAD TO DUCKDB (Processed → DuckDB for Marts)
+    # ========================================================================
+    
+    load_to_warehouse = BashOperator(
+        task_id='load_to_warehouse',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/load_to_duckdb.py "{{{{ ti.xcom_pull(task_ids=\'set_pipeline_year\') }}}}"',
         dag=dag,
     )
     
@@ -211,19 +236,31 @@ with DAG(
     # ========================================================================
     
     # Layer 1 (Scrapers) - parallel after year is set
+    # generate_curated_contracts runs first (idempotent, creates CSV if missing)
+    # Then run optional live scrapers in parallel (use generated contracts as fallback)
+    set_year >> generate_curated_contracts
     set_year >> [scrape_spotrac_team_caps, scrape_pfr_rosters, scrape_spotrac_player_rankings]
     
-    # Layer 2 (Staging) - depends on respective scrapers
+    # Layer 2 (Staging) - depends on respective scrapers + curated contracts
     scrape_spotrac_team_caps >> stage_spotrac_team_caps
     scrape_pfr_rosters >> stage_pfr_rosters
     scrape_spotrac_player_rankings >> stage_spotrac_rankings
+    generate_curated_contracts >> stage_spotrac_contracts  # Use generated contracts as primary source
     
     # Layer 3 (Normalization) - depends on all staging
-    [stage_spotrac_team_caps, stage_pfr_rosters, stage_spotrac_rankings] >> normalize_data
+    [stage_spotrac_team_caps, stage_pfr_rosters, stage_spotrac_rankings, stage_spotrac_contracts] >> normalize_data
     
-    # Layer 4 (dbt) - sequential
-    normalize_data >> dbt_seed >> dbt_run_staging >> dbt_run_marts
+    # Layer 3.5 (DuckDB Loading) - depends on normalization
+    normalize_data >> load_to_warehouse
     
+    # Layer 4 (dbt Transforms) - depends on DuckDB loading (can skip dbt_seed if using direct load)
+    load_to_warehouse >> dbt_seed >> dbt_run_staging >> dbt_run_marts
+    
+    # Layer 5 (Validation) - depends on dbt marts
+    dbt_run_marts >> [data_quality_checks, validate_dead_money]
+    
+    # Layer 6 (Reporting) - depends on validation
+    [data_quality_checks, validate_dead_money] >> run_salary_analysis_notebook
     # Layer 5 (Validation) - parallel after dbt
     dbt_run_marts >> [data_quality_checks, validate_dead_money]
     

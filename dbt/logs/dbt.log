@@ -6486,3 +6486,69 @@ where year is null
 [0m19:52:39.655382 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x106477380>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x100e43b60>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x103f33710>]}
 [0m19:52:39.655498 [debug] [MainThread]: Flushing usage events
 [0m19:52:40.377761 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m16:12:54.571210 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10b867770>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ceb39d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ceb3c50>]}
+
+
+============================== 16:12:54.575015 | 9d5c8b4d-e687-4375-afe9-d5cdedac68f8 ==============================
+[0m16:12:54.575015 [info ] [MainThread]: Running with dbt=1.10.15
+[0m16:12:54.575384 [debug] [MainThread]: running dbt with arguments {'use_colors': 'True', 'debug': 'False', 'introspect': 'True', 'log_path': 'dbt/logs', 'log_format': 'default', 'use_experimental_parser': 'False', 'invocation_command': 'dbt seed --project-dir ./dbt --profiles-dir ./dbt', 'partial_parse': 'True', 'static_parser': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'quiet': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'profiles_dir': './dbt', 'no_print': 'None', 'version_check': 'True', 'printer_width': '80', 'warn_error': 'None', 'cache_selected_only': 'False', 'send_anonymous_usage_stats': 'True', 'target_path': 'None', 'indirect_selection': 'eager', 'write_json': 'True', 'empty': 'None'}
+[0m16:12:54.953832 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '9d5c8b4d-e687-4375-afe9-d5cdedac68f8', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10c17f950>]}
+[0m16:12:54.975256 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '9d5c8b4d-e687-4375-afe9-d5cdedac68f8', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10cfc9ae0>]}
+[0m16:12:54.977191 [info ] [MainThread]: Registered adapter: duckdb=1.10.0
+[0m16:12:55.029056 [debug] [MainThread]: checksum: 14a228079bd6df63ba81633f9a3cf44ecfaa31056ac397c602753ec895dbf885, vars: {}, profile: , target: , version: 1.10.15
+[0m16:12:55.104221 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 3 files added, 0 files changed.
+[0m16:12:55.104606 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/marts/fct_player_dead_money_features.sql
+[0m16:12:55.104749 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/staging/stg_player_contracts.sql
+[0m16:12:55.104851 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/staging/stg_player_rosters.sql
+[0m16:12:55.174009 [error] [MainThread]: Encountered an error:
+Compilation Error
+  Model 'model.nfl_dead_money.stg_player_contracts' (models/staging/stg_player_contracts.sql) depends on a source named 'raw.player_contracts_raw' which was not found
+[0m16:12:55.175919 [debug] [MainThread]: Resource report: {"command_name": "seed", "command_success": false, "command_wall_clock_time": 0.6350012, "process_in_blocks": "0", "process_kernel_time": 0.206205, "process_mem_max_rss": "159580160", "process_out_blocks": "0", "process_user_time": 1.193958}
+[0m16:12:55.176235 [debug] [MainThread]: Command `dbt seed` failed at 16:12:55.176184 after 0.64 seconds
+[0m16:12:55.176427 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10d2ead50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10d2eb150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10d5e9a90>]}
+[0m16:12:55.176579 [debug] [MainThread]: Flushing usage events
+[0m16:12:56.245089 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m16:52:17.219283 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10b777770>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10cdc39d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10cdc3c50>]}
+
+
+============================== 16:52:17.222848 | 28e68194-aedf-4a48-a6c2-50b608fa21f8 ==============================
+[0m16:52:17.222848 [info ] [MainThread]: Running with dbt=1.10.15
+[0m16:52:17.223091 [debug] [MainThread]: running dbt with arguments {'log_format': 'default', 'log_cache_events': 'False', 'debug': 'False', 'static_parser': 'True', 'quiet': 'False', 'introspect': 'True', 'empty': 'False', 'write_json': 'True', 'warn_error': 'None', 'cache_selected_only': 'False', 'indirect_selection': 'eager', 'use_colors': 'True', 'fail_fast': 'False', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'target_path': 'None', 'invocation_command': 'dbt run --project-dir ./dbt --profiles-dir ./dbt --select tag:prediction', 'use_experimental_parser': 'False', 'partial_parse': 'True', 'version_check': 'True', 'no_print': 'None', 'send_anonymous_usage_stats': 'True', 'printer_width': '80', 'log_path': 'dbt/logs', 'profiles_dir': './dbt'}
+[0m16:52:17.302793 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '28e68194-aedf-4a48-a6c2-50b608fa21f8', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10c08f950>]}
+[0m16:52:17.321461 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '28e68194-aedf-4a48-a6c2-50b608fa21f8', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ceddae0>]}
+[0m16:52:17.322881 [info ] [MainThread]: Registered adapter: duckdb=1.10.0
+[0m16:52:17.360668 [debug] [MainThread]: checksum: 14a228079bd6df63ba81633f9a3cf44ecfaa31056ac397c602753ec895dbf885, vars: {}, profile: , target: , version: 1.10.15
+[0m16:52:17.424034 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 3 files added, 0 files changed.
+[0m16:52:17.424336 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/staging/stg_player_contracts.sql
+[0m16:52:17.424452 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/staging/stg_player_rosters.sql
+[0m16:52:17.424547 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/marts/fct_player_dead_money_features.sql
+[0m16:52:17.484102 [error] [MainThread]: Encountered an error:
+Compilation Error
+  Model 'model.nfl_dead_money.stg_player_contracts' (models/staging/stg_player_contracts.sql) depends on a source named 'raw.player_contracts_raw' which was not found
+[0m16:52:17.485275 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.2908104, "process_in_blocks": "0", "process_kernel_time": 0.132384, "process_mem_max_rss": "158941184", "process_out_blocks": "0", "process_user_time": 1.040381}
+[0m16:52:17.485494 [debug] [MainThread]: Command `dbt run` failed at 16:52:17.485452 after 0.29 seconds
+[0m16:52:17.485646 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10d1fad50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10d1fb150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10d4f9a90>]}
+[0m16:52:17.485783 [debug] [MainThread]: Flushing usage events
+[0m16:52:18.475458 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m07:32:58.036200 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10cf9b770>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10e5e79d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10e5e7c50>]}
+
+
+============================== 07:32:58.042358 | f9e055f5-24a2-43b8-87fd-d3c2200e2189 ==============================
+[0m07:32:58.042358 [info ] [MainThread]: Running with dbt=1.10.15
+[0m07:32:58.042600 [debug] [MainThread]: running dbt with arguments {'log_cache_events': 'False', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'debug': 'False', 'quiet': 'False', 'use_colors': 'True', 'static_parser': 'True', 'introspect': 'True', 'write_json': 'True', 'printer_width': '80', 'log_format': 'default', 'fail_fast': 'False', 'empty': 'None', 'invocation_command': 'dbt seed --project-dir ./dbt --profiles-dir ./dbt', 'log_path': 'dbt/logs', 'profiles_dir': './dbt', 'use_experimental_parser': 'False', 'warn_error': 'None', 'indirect_selection': 'eager', 'no_print': 'None', 'send_anonymous_usage_stats': 'True', 'cache_selected_only': 'False', 'version_check': 'True', 'partial_parse': 'True', 'target_path': 'None'}
+[0m07:32:58.179681 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'f9e055f5-24a2-43b8-87fd-d3c2200e2189', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10d8b7950>]}
+[0m07:32:58.199069 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'f9e055f5-24a2-43b8-87fd-d3c2200e2189', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10e6f9ae0>]}
+[0m07:32:58.200312 [info ] [MainThread]: Registered adapter: duckdb=1.10.0
+[0m07:32:58.240278 [debug] [MainThread]: checksum: 14a228079bd6df63ba81633f9a3cf44ecfaa31056ac397c602753ec895dbf885, vars: {}, profile: , target: , version: 1.10.15
+[0m07:32:58.307537 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 3 files added, 0 files changed.
+[0m07:32:58.307858 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/marts/fct_player_dead_money_features.sql
+[0m07:32:58.307971 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/staging/stg_player_contracts.sql
+[0m07:32:58.308068 [debug] [MainThread]: Partial parsing: added file: nfl_dead_money://models/staging/stg_player_rosters.sql
+[0m07:32:58.369195 [error] [MainThread]: Encountered an error:
+Compilation Error
+  Model 'model.nfl_dead_money.stg_player_contracts' (models/staging/stg_player_contracts.sql) depends on a source named 'raw.player_contracts_raw' which was not found
+[0m07:32:58.370420 [debug] [MainThread]: Resource report: {"command_name": "seed", "command_success": false, "command_wall_clock_time": 0.3595345, "process_in_blocks": "0", "process_kernel_time": 0.153439, "process_mem_max_rss": "159367168", "process_out_blocks": "0", "process_user_time": 1.047286}
+[0m07:32:58.370603 [debug] [MainThread]: Command `dbt seed` failed at 07:32:58.370563 after 0.36 seconds
+[0m07:32:58.370754 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ea1ed50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ea1f150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10ed1da90>]}
+[0m07:32:58.370899 [debug] [MainThread]: Flushing usage events
+[0m07:32:59.275492 [debug] [MainThread]: An error was encountered while trying to flush usage events

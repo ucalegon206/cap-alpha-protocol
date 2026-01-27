@@ -425,6 +425,176 @@ class SpotracScraper:
         logger.info(f"  ✓ All quality checks passed")
         return df
 
+    def scrape_player_contracts(self, year: int, max_retries: int = 2) -> pd.DataFrame:
+        """
+        Scrape player-level contract details from Spotrac team contracts pages.
+        
+        Iterates through each team's contracts page and aggregates contract details.
+        Includes retry logic for failed team pages.
+        
+        Returns DataFrame with columns:
+        - player_name: Player name
+        - team: Team abbreviation
+        - position: Player position
+        - year: Season year
+        - total_contract_value_millions: Total contract value
+        - guaranteed_money_millions: Guaranteed money in contract
+        - signing_bonus_millions: Signing bonus
+        - contract_length_years: Total years in contract
+        - years_remaining: Years remaining on contract
+        - cap_hit_millions: Current year cap hit
+        - dead_cap_millions: Current year dead cap
+        """
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from bs4 import BeautifulSoup
+        
+        # Team codes to iterate
+        team_codes = [
+            'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE', 'DAL', 'DEN',
+            'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC', 'LAC', 'LAR', 'LV', 'MIA',
+            'MIN', 'NE', 'NO', 'NYG', 'NYJ', 'PHI', 'PIT', 'SF', 'SEA', 'TB',
+            'TEN', 'WAS'
+        ]
+        
+        all_contracts = []
+        successful_teams = 0
+        logger.info(f"Scraping player contracts for {year} ({len(team_codes)} teams)")
+        
+        for team_code in team_codes:
+            success = False
+            for attempt in range(max_retries + 1):
+                try:
+                    # Convert team code to lowercase for URL
+                    team_url = team_code.lower()
+                    url = f"https://www.spotrac.com/nfl/team/{team_url}/contracts/"
+                    
+                    if attempt == 0:
+                        logger.info(f"  → {team_code}: {url}")
+                    else:
+                        logger.info(f"  → {team_code} (retry {attempt}/{max_retries})")
+                    
+                    # Use longer timeout and extended wait
+                    self.driver.set_page_load_timeout(30)
+                    self.driver.get(url)
+                    
+                    # Wait for table with longer timeout
+                    try:
+                        WebDriverWait(self.driver, 20).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "table.dataTable"))
+                        )
+                        time.sleep(2)  # Extended wait for rendering
+                    except Exception as e:
+                        logger.debug(f"    Initial wait failed: {e}, trying longer wait...")
+                        # Try another wait with different selector
+                        try:
+                            WebDriverWait(self.driver, 20).until(
+                                EC.presence_of_element_located((By.TAG_NAME, "table"))
+                            )
+                            time.sleep(3)
+                        except:
+                            logger.warning(f"    ⚠️ Failed to load contracts for {team_code} (attempt {attempt+1})")
+                            if attempt < max_retries:
+                                time.sleep(5)  # Wait before retry
+                            continue
+                    
+                    soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                    
+                    # Find contract table - try multiple selectors
+                    table = None
+                    
+                    # First try dataTable class
+                    tables = soup.find_all('table', {'class': 'dataTable'})
+                    for tbl in tables:
+                        if tbl.find('tbody'):
+                            table = tbl
+                            break
+                    
+                    # Fallback: any table with tbody
+                    if not table:
+                        for tbl in soup.find_all('table'):
+                            if tbl.find('tbody'):
+                                table = tbl
+                                break
+                    
+                    if not table:
+                        logger.debug(f"    No contracts table found for {team_code}")
+                        if attempt < max_retries:
+                            time.sleep(5)
+                            continue
+                        else:
+                            break
+                    
+                    tbody = table.find('tbody')
+                    if not tbody:
+                        logger.warning(f"    ⚠️ Table missing tbody for {team_code}")
+                        if attempt < max_retries:
+                            time.sleep(5)
+                            continue
+                        else:
+                            break
+                    
+                    # Extract headers
+                    thead = table.find('thead')
+                    headers = []
+                    if thead:
+                        headers = [th.text.strip().replace('\n', ' ').lower() for th in thead.find_all('th')]
+                    
+                    # Extract rows
+                    rows = []
+                    for tr in tbody.find_all('tr'):
+                        tds = tr.find_all('td')
+                        if len(tds) < 2:
+                            continue
+                        row = []
+                        for td in tds:
+                            text = td.text.strip().replace('\n', ' ')
+                            row.append(text)
+                        if row:
+                            rows.append(row)
+                    
+                    logger.info(f"    ✓ Extracted {len(rows)} contracts for {team_code}")
+                    
+                    # Build team-specific DataFrame
+                    if rows and headers:
+                        df_team = pd.DataFrame(rows, columns=headers[:len(rows[0]) if rows else 0])
+                        df_team['team'] = team_code
+                        all_contracts.append(df_team)
+                        successful_teams += 1
+                        success = True
+                    
+                    time.sleep(2)  # Rate limiting between teams
+                    break  # Success, move to next team
+                    
+                except Exception as e:
+                    logger.debug(f"  Exception on {team_code} attempt {attempt+1}: {e}")
+                    if attempt < max_retries:
+                        time.sleep(5)
+                        continue
+                    else:
+                        logger.warning(f"  ✗ Failed to scrape {team_code} after {max_retries+1} attempts")
+                        break
+            
+            if not success:
+                logger.warning(f"    Skipping {team_code} - unable to retrieve")
+        
+        # Combine all team contracts
+        if not all_contracts:
+            raise DataQualityError(f"No contract data collected for {year}")
+        
+        df = pd.concat(all_contracts, ignore_index=True)
+        logger.info(f"  ✓ Total contracts collected: {len(df)} rows from {successful_teams}/{len(team_codes)} teams")
+        
+        # TRANSFORMATION: Normalize columns
+        df = self._normalize_player_contract_df(df, year)
+        
+        # TRANSFORMATION QUALITY CHECKS
+        self._validate_player_contract_data(df, year)
+        
+        logger.info(f"  ✓ All quality checks passed")
+        return df
+
     def scrape_player_salaries(self, year: int) -> pd.DataFrame:
         """
         Scrape player-level dead money data from Spotrac for a given year.
@@ -588,6 +758,60 @@ class SpotracScraper:
         df = df[[c for c in keep_cols if c in df.columns]]
         
         return df
+
+    def _normalize_player_contract_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
+        """Normalize contract columns from team contracts pages"""
+        
+        # Rename columns - look for common contract-related headers
+        col_map = {}
+        for col in df.columns:
+            col_lower = col.lower()
+            if 'player' in col_lower or 'name' in col_lower:
+                col_map[col] = 'player_name'
+            elif 'team' in col_lower and 'avg' not in col_lower:
+                col_map[col] = 'team'
+            elif 'pos' in col_lower:
+                col_map[col] = 'position'
+            elif 'contract' in col_lower and 'value' in col_lower:
+                col_map[col] = 'total_contract_value'
+            elif 'guaranteed' in col_lower or 'guarantee' in col_lower:
+                col_map[col] = 'guaranteed_money'
+            elif 'signing' in col_lower and 'bonus' in col_lower:
+                col_map[col] = 'signing_bonus'
+            elif 'contract' in col_lower and 'year' in col_lower:
+                col_map[col] = 'contract_length_years'
+            elif 'years' in col_lower and 'remaining' in col_lower:
+                col_map[col] = 'years_remaining'
+            elif 'cap' in col_lower and 'hit' in col_lower:
+                col_map[col] = 'cap_hit'
+            elif 'dead' in col_lower and 'cap' in col_lower:
+                col_map[col] = 'dead_cap'
+                
+        df = df.rename(columns=col_map)
+        
+        # Parse money columns
+        money_cols = ['total_contract_value', 'guaranteed_money', 'signing_bonus', 'cap_hit', 'dead_cap']
+        for col in money_cols:
+            if col in df.columns:
+                df[f'{col}_millions'] = df[col].apply(self._parse_money)
+        
+        # Parse numeric columns
+        numeric_cols = ['contract_length_years', 'years_remaining']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Add year
+        df['year'] = year
+        
+        # Keep only useful columns
+        keep_cols = ['player_name', 'team', 'position', 'year',
+                     'total_contract_value_millions', 'guaranteed_money_millions', 
+                     'signing_bonus_millions', 'contract_length_years', 'years_remaining',
+                     'cap_hit_millions', 'dead_cap_millions']
+        df = df[[c for c in keep_cols if c in df.columns]]
+        
+        return df
         
     def _validate_player_salary_data(self, df: pd.DataFrame, year: int):
         """Run data quality checks on player salary data"""
@@ -678,6 +902,44 @@ class SpotracScraper:
             total_cap = df['cap_hit_millions'].sum()
             logger.info(f"  ✓ Total league cap hit: ${total_cap:.1f}M")
 
+    def _validate_player_contract_data(self, df: pd.DataFrame, year: int):
+        """Run data quality checks on player contract data"""
+        
+        # Check 1: Minimum records
+        if len(df) < 500:
+            logger.warning(f"⚠️ Expected ≥500 player contracts, got {len(df)}")
+            
+        # Check 2: Required columns
+        required = ['player_name', 'team', 'year']
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            raise DataQualityError(f"Missing required columns: {missing}")
+            
+        # Check 3: No nulls in critical columns
+        if df['player_name'].isnull().sum() > 0:
+            raise DataQualityError("player_name has nulls")
+            
+        # Check 4: Team coverage
+        unique_teams = df['team'].nunique()
+        if unique_teams < 20:
+            raise DataQualityError(f"Only {unique_teams} unique teams (expected ≥25)")
+        
+        # Check 5: Guaranteed money ranges (if present)
+        if 'guaranteed_money_millions' in df.columns:
+            max_guaranteed = df['guaranteed_money_millions'].max()
+            if max_guaranteed > 200:
+                logger.warning(f"⚠️ Max guaranteed money ${max_guaranteed}M is very high")
+        
+        # Check 6: Signing bonus ranges (if present)
+        if 'signing_bonus_millions' in df.columns:
+            max_bonus = df['signing_bonus_millions'].max()
+            if max_bonus > 100:
+                logger.warning(f"⚠️ Max signing bonus ${max_bonus}M is very high")
+        
+        logger.info(f"  ✓ Teams covered: {unique_teams}")
+        logger.info(f"  ✓ Contracts recorded: {len(df)}")
+        logger.info(f"  ✓ Year: {year}")
+
 
 def scrape_and_save_team_cap(
     year: int,
@@ -701,6 +963,35 @@ def scrape_and_save_team_cap(
     
     with SpotracScraper(headless=True) as scraper:
         df = scraper.scrape_team_cap(year)
+        df.to_csv(filepath, index=False)
+        
+    logger.info(f"✓ Saved {len(df)} records to {filepath}")
+    
+    return filepath
+
+
+def scrape_and_save_player_contracts(
+    year: int,
+    output_dir: str = 'data/raw',
+    run_timestamp: Optional[datetime] = None,
+    iso_week_tag: Optional[str] = None,
+) -> Path:
+    """
+    Scrape player contract data and save to CSV with timestamp.
+    
+    Returns path to saved file.
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    default_iso, default_ts = _build_run_tags(run_timestamp)
+    if iso_week_tag:
+        default_iso = iso_week_tag
+    filename = f"spotrac_player_contracts_{year}_{default_iso}_{default_ts}.csv"
+    filepath = output_path / filename
+    
+    with SpotracScraper(headless=True) as scraper:
+        df = scraper.scrape_player_contracts(year)
         df.to_csv(filepath, index=False)
         
     logger.info(f"✓ Saved {len(df)} records to {filepath}")
@@ -774,6 +1065,7 @@ if __name__ == '__main__':
         print("  python src/spotrac_scraper_v2.py team-cap YEAR")
         print("  python src/spotrac_scraper_v2.py player-salaries YEAR")
         print("  python src/spotrac_scraper_v2.py player-rankings YEAR")
+        print("  python src/spotrac_scraper_v2.py player-contracts YEAR")
         print("  python src/spotrac_scraper_v2.py backfill START_YEAR END_YEAR")
         sys.exit(1)
     
@@ -795,6 +1087,11 @@ if __name__ == '__main__':
             year = int(sys.argv[2])
             filepath = scrape_and_save_player_rankings(year, run_timestamp=run_timestamp)
             print(f"\n✅ SUCCESS: Player rankings data saved to {filepath}")
+            
+        elif command == 'player-contracts':
+            year = int(sys.argv[2])
+            filepath = scrape_and_save_player_contracts(year, run_timestamp=run_timestamp)
+            print(f"\n✅ SUCCESS: Player contracts data saved to {filepath}")
             
         elif command == 'backfill':
             start_year = int(sys.argv[2])
