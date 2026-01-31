@@ -13,7 +13,16 @@ from difflib import SequenceMatcher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+ 
+TEAM_MAPPING = {
+    'ARI': 'ARI', 'ATL': 'ATL', 'BAL': 'BAL', 'BUF': 'BUF', 'CAR': 'CAR',
+    'CHI': 'CHI', 'CIN': 'CIN', 'CLE': 'CLE', 'DAL': 'DAL', 'DEN': 'DEN',
+    'DET': 'DET', 'GNB': 'GB',  'HOU': 'HOU', 'IND': 'IND', 'JAX': 'JAX',
+    'KAN': 'KC',  'LAC': 'LAC', 'LAR': 'LAR', 'LVR': 'LV',  'MIA': 'MIA',
+    'MIN': 'MIN', 'NWE': 'NE',  'NOR': 'NO',  'NYG': 'NYG', 'NYJ': 'NYJ',
+    'PHI': 'PHI', 'PIT': 'PIT', 'SFO': 'SF',  'SEA': 'SEA', 'TAM': 'TB',
+    'TEN': 'TEN', 'WAS': 'WAS'
+}
 
 def fuzzy_match_player(
     name: str,
@@ -35,9 +44,12 @@ def fuzzy_match_player(
     Returns:
         Best matching row or None
     """
+    # Map team code if needed (PFR -> Spotrac)
+    spotrac_team = TEAM_MAPPING.get(team.upper(), team.upper())
+    
     # Filter candidates by team and year
     candidates = candidates_df[
-        (candidates_df['team'].str.upper() == team.upper()) &
+        (candidates_df['team'].str.upper() == spotrac_team) &
         (candidates_df['year'] == year)
     ].copy()
     
@@ -97,6 +109,11 @@ def merge_rosters_and_salaries(
     rosters['salary_millions'] = None
     rosters['cap_hit_millions'] = None
     rosters['dead_cap_millions'] = None
+    rosters['total_contract_value_millions'] = None
+    rosters['guaranteed_money_millions'] = None
+    rosters['signing_bonus_millions'] = None
+    rosters['contract_length_years'] = None
+    rosters['years_remaining'] = None
     rosters['salary_match_score'] = None
     
     # Track matches
@@ -125,6 +142,11 @@ def merge_rosters_and_salaries(
             rosters.at[idx, 'salary_millions'] = match.get('salary_millions', None)
             rosters.at[idx, 'cap_hit_millions'] = match.get('cap_hit_millions', None)
             rosters.at[idx, 'dead_cap_millions'] = match.get('dead_cap_millions', None)
+            rosters.at[idx, 'total_contract_value_millions'] = match.get('total_contract_value_millions', None)
+            rosters.at[idx, 'guaranteed_money_millions'] = match.get('guaranteed_money_millions', None)
+            rosters.at[idx, 'signing_bonus_millions'] = match.get('signing_bonus_millions', None)
+            rosters.at[idx, 'contract_length_years'] = match.get('contract_length_years', None)
+            rosters.at[idx, 'years_remaining'] = match.get('years_remaining', None)
             rosters.at[idx, 'salary_match_score'] = match.get('similarity', None)
             matched += 1
         else:
@@ -142,11 +164,15 @@ def merge_rosters_and_salaries(
     
     logger.info(f"✓ Saved merged data to {output_path}")
     
-    # Summary stats
-    logger.info("\nSalary Data Summary:")
-    logger.info(f"  Records with salary: {rosters['salary_millions'].notna().sum():,}")
-    logger.info(f"  Avg salary (with data): ${rosters['salary_millions'].mean():.2f}M")
-    logger.info(f"  Total salary: ${rosters['salary_millions'].sum():.1f}M")
+    # Print summary
+    with_salary = rosters[rosters['total_contract_value_millions'].notna()]
+    logger.info(f"\nContract Data Summary:")
+    logger.info(f"  Records with contract data: {len(with_salary)}")
+    if len(with_salary) > 0:
+        avg_val = with_salary['total_contract_value_millions'].mean()
+        total_val = with_salary['total_contract_value_millions'].sum()
+        logger.info(f"  Avg total value: ${avg_val:.1f}M")
+        logger.info(f"  Total contract value: ${total_val:.1f}M")
     
     return rosters
 
