@@ -127,31 +127,43 @@ class SpotracParser:
             pos_str = "Unknown"
             small_tag = item.find('small')
             if small_tag:
-                 # expected format "KC, QB" or similar text
                  parts = small_tag.text.strip().split(',')
                  if len(parts) >= 1: team_str = parts[0].strip()
                  if len(parts) >= 2: pos_str = parts[1].strip()
 
             # Value (Cap Hit / salary)
-            # Usually in a span with class "medium" or just right aligned
             value_str = "0"
-            # Try specific classes first
             val_span = item.find('span', class_='medium')
             if not val_span:
                 val_span = item.find('span', class_='bold')
-            
             if val_span:
                 value_str = val_span.text.strip()
             
-            # Rank - often just an index or a specific span, but order matters mostly
-            # We can treat the list order as rank if explicit rank isn't found
+            # Rank
             rank_span = item.find('span', class_='rank-value') 
             rank = rank_span.text.strip() if rank_span else str(len(rows) + 1)
-
-            # Construct row: [Rank, Player, Team, Pos, Value]
-            rows.append([rank, player_name, team_str, pos_str, value_str])
             
-        headers = ['rank', 'player', 'team', 'pos', 'value']
+            # Age Heuristic: Look for a 2-digit number in the text that isn't rank or part of value
+            # Typical text: "1 Patrick Mahomes KC, QB 29 $59,800,000"
+            # We already have rank, value_str, team_str, pos_str.
+            # Let's extract all numbers from text and find the one that fits Age profile (20-48).
+            
+            import re
+            full_text = item.get_text(" ", strip=True) 
+            # Replace known parts to isolate Age
+            temp_text = full_text.replace(rank, "").replace(value_str, "").replace(team_str, "").replace(pos_str, "")
+            # Find integers
+            candidates = re.findall(r'\b\d{2}\b', temp_text)
+            age = ""
+            for c in candidates:
+                if 20 <= int(c) <= 48:
+                    age = c
+                    break
+            
+            # Construct row: [Rank, Player, Team, Pos, Age, Value]
+            rows.append([rank, player_name, team_str, pos_str, age, value_str])
+            
+        headers = ['rank', 'player', 'team', 'pos', 'age', 'value']
         return headers, rows
 
     def parse_money(self, value: str) -> float:
@@ -602,10 +614,10 @@ class SpotracScraper:
             from selenium.webdriver.support.ui import WebDriverWait
             from selenium.webdriver.support import expected_conditions as EC
             
-            # Try to wait for table with extended timeout
-            logger.info("  Waiting for table (up to 60 seconds)...")
+            # Try to wait for table OR list-group (new layout)
+            logger.info("  Waiting for table or list (up to 60 seconds)...")
             WebDriverWait(self.driver, 60).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "table tbody tr"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "table tbody tr, .list-group-item"))
             )
             logger.info("  ✓ Table found, waiting for full render...")
             time.sleep(10)  # Extended wait for all rows to render

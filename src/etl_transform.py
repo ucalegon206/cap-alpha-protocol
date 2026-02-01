@@ -64,11 +64,46 @@ def load_spotrac():
         
     fin['cap_hit_m'] = pd.to_numeric(fin['cap_hit_m'], errors='coerce').fillna(0)
     
+    # Backfill Age from 2024/2025 data
+    if 'age' in fin.columns:
+        fin['age'] = pd.to_numeric(fin['age'], errors='coerce')
+        
+        # Create Anchor Map (Prefer 2024, then 2025)
+        age_map = {}
+        # Iterate through years descending to define anchor (2024 overrides 2025 if both exist? No, we want latest valid)
+        # Actually 2024 is best anchor.
+        # Get subset of players with valid age
+        known_ages = fin[fin['age'].notna()].copy()
+        for _, row in known_ages.iterrows():
+            # Store Birth Year implies Age
+            # Birth Year = Year - Age
+            # This is constant.
+            birth_year = row['year'] - row['age']
+            age_map[row['clean_name']] = birth_year
+            
+        # Apply Backfill
+        def fill_age_from_birth_year(row):
+            if pd.notna(row['age']): return row['age']
+            if row['clean_name'] in age_map:
+                return row['year'] - age_map[row['clean_name']]
+            return np.nan
+            
+        fin['age'] = fin.apply(fill_age_from_birth_year, axis=1)
+
+    else:
+        fin['age'] = np.nan
+    
     # Add Cap Context
     fin['salary_cap'] = fin['year'].map(CAP_HISTORY)
     fin['cap_pct'] = (fin['cap_hit_m'] / fin['salary_cap']) * 100
     
-    return fin[['year', 'clean_name', 'player_name', 'team', 'position', 'cap_hit_m', 'cap_pct']]
+    # Add Age if present
+    if 'age' in fin.columns:
+        fin['age'] = pd.to_numeric(fin['age'], errors='coerce')
+    else:
+        fin['age'] = np.nan
+
+    return fin[['year', 'clean_name', 'player_name', 'team', 'position', 'age', 'cap_hit_m', 'cap_pct']]
 
 def load_pfr():
     logger.info("Loading PFR Performance...")
