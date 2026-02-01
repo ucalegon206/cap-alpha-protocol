@@ -8,7 +8,7 @@ Includes comprehensive data quality validation at ingestion and transformation s
 import pandas as pd
 import logging
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 import time
 from datetime import datetime
 
@@ -46,6 +46,303 @@ def _deduplicate_headers(headers: List[str]) -> List[str]:
             new_headers.append(h)
     return new_headers
 
+    return new_headers
+
+class SpotracParser:
+    """Handles parsing and normalization of Spotrac HTML content."""
+    
+    def __init__(self):
+        from bs4 import BeautifulSoup
+        self.bs = BeautifulSoup
+
+    def parse_table(self, html: str) -> Tuple[List[str], List[List[str]]]:
+        """Extract headers and rows from first valid table in HTML."""
+        soup = self.bs(html, 'html.parser')
+        table = None
+        
+        # Priority selectors
+        tables = soup.find_all('table', {'class': 'dataTable'})
+        for tbl in tables:
+            if tbl.find('tbody'):
+                table = tbl
+                break
+        
+        if not table:
+            for tbl in soup.find_all('table'):
+                if tbl.find('tbody'):
+                    table = tbl
+                    break
+        
+        if not table:
+            return [], []
+            
+        # Headers
+        thead = table.find('thead')
+        headers = []
+        if thead:
+            headers = [th.text.strip().replace('\n', ' ').lower() for th in thead.find_all('th')]
+            headers = _deduplicate_headers(headers)
+            
+        # Rows
+        rows = []
+        tbody = table.find('tbody')
+        if tbody:
+            for tr in tbody.find_all('tr'):
+                tds = tr.find_all('td')
+                if len(tds) < 2: continue
+                row = [td.text.strip().replace('\n', ' ') for td in tds]
+                if row: rows.append(row)
+                
+        return headers, rows
+
+    def parse_rankings_list_group(self, html: str) -> Tuple[List[str], List[List[str]]]:
+        """
+        Extract data from Spotrac's new div-based list-group structure for rankings.
+        Returns generic headers ['rank', 'player', 'team', 'value'] and row data.
+        """
+        soup = self.bs(html, 'html.parser')
+        rows = []
+        
+        # Find all list-group-items that look like player rows
+        # Structure: li.list-group-item > ... > div.link > a (Player)
+        # Value is usually in a span.medium or span.bold
+        
+        items = soup.find_all('li', class_='list-group-item')
+        if not items:
+            return [], []
+            
+        for item in items:
+            # Player Name
+            link_div = item.find('div', class_='link')
+            if not link_div: 
+                continue
+                
+            player_a = link_div.find('a')
+            if not player_a:
+                continue
+            player_name = player_a.text.strip()
+            
+            # Team/Pos line often looks like: "KC, QB" inside a small tag or similar
+            team_str = "Unknown"
+            pos_str = "Unknown"
+            small_tag = item.find('small')
+            if small_tag:
+                 # expected format "KC, QB" or similar text
+                 parts = small_tag.text.strip().split(',')
+                 if len(parts) >= 1: team_str = parts[0].strip()
+                 if len(parts) >= 2: pos_str = parts[1].strip()
+
+            # Value (Cap Hit / salary)
+            # Usually in a span with class "medium" or just right aligned
+            value_str = "0"
+            # Try specific classes first
+            val_span = item.find('span', class_='medium')
+            if not val_span:
+                val_span = item.find('span', class_='bold')
+            
+            if val_span:
+                value_str = val_span.text.strip()
+            
+            # Rank - often just an index or a specific span, but order matters mostly
+            # We can treat the list order as rank if explicit rank isn't found
+            rank_span = item.find('span', class_='rank-value') 
+            rank = rank_span.text.strip() if rank_span else str(len(rows) + 1)
+
+            # Construct row: [Rank, Player, Team, Pos, Value]
+            rows.append([rank, player_name, team_str, pos_str, value_str])
+            
+        headers = ['rank', 'player', 'team', 'pos', 'value']
+        return headers, rows
+
+    def parse_money(self, value: str) -> float:
+        """Parse money string like '$255.4M' or '$60,985,272' to millions"""
+        if pd.isna(value) or not value or value == '-' or value == '':
+            return 0.0
+        
+        # Clean the string
+        clean_val = str(value).replace('$', '').replace(',', '').strip()
+        
+        try:
+            if 'M' in clean_val:
+                return float(clean_val.replace('M', ''))
+            elif 'B' in clean_val:
+                return float(clean_val.replace('B', '')) * 1000.0
+            elif 'K' in clean_val:
+                return float(clean_val.replace('K', '')) / 1000.0
+            else:
+                # Assume raw dollars
+                return float(clean_val) / 1_000_000.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    def normalize_player_contract_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
+        """Normalize contract columns from team contracts pages"""
+        col_map = {}
+        mapped_targets = set()
+        
+        for col in df.columns:
+            col_lower = col.lower()
+            target = None
+            if ('player' in col_lower or 'name' in col_lower) and 'player_name' not in mapped_targets:
+                target = 'player_name'
+            elif 'team' in col_lower and 'avg' not in col_lower and 'team' not in mapped_targets:
+                target = 'team'
+            elif 'pos' in col_lower and 'position' not in mapped_targets:
+                target = 'position'
+            elif (('contract' in col_lower and 'value' in col_lower) or col_lower == 'value') and 'total_contract_value' not in mapped_targets:
+                target = 'total_contract_value'
+            elif ('guaranteed' in col_lower or 'guarantee' in col_lower) and 'guaranteed_money' not in mapped_targets:
+                target = 'guaranteed_money'
+            elif 'signing' in col_lower and 'bonus' in col_lower and 'signing_bonus' not in mapped_targets:
+                target = 'signing_bonus'
+            elif 'contract' in col_lower and 'year' in col_lower and 'contract_length_years' not in mapped_targets:
+                target = 'contract_length_years'
+            elif 'years' in col_lower and 'remaining' in col_lower and 'years_remaining' not in mapped_targets:
+                target = 'years_remaining'
+            elif 'cap' in col_lower and 'hit' in col_lower and 'cap_hit' not in mapped_targets:
+                target = 'cap_hit'
+            elif 'dead' in col_lower and 'cap' in col_lower and 'dead_cap' not in mapped_targets:
+                target = 'dead_cap'
+            
+            if target:
+                col_map[col] = target
+                mapped_targets.add(target)
+                
+        df = df.rename(columns=col_map).copy()
+        
+        # Parse money columns
+        money_cols = ['total_contract_value', 'guaranteed_money', 'signing_bonus', 'cap_hit', 'dead_cap']
+        for col in money_cols:
+            if col in df.columns:
+                df[f'{col}_millions'] = df[col].apply(self.parse_money)
+        
+        df['year'] = year
+        keep_cols = ['player_name', 'team', 'position', 'year',
+                     'total_contract_value_millions', 'guaranteed_money_millions', 
+                     'signing_bonus_millions', 'contract_length_years', 'years_remaining',
+                     'cap_hit_millions', 'dead_cap_millions']
+        df = df[[c for c in keep_cols if c in df.columns]]
+        
+        if 'player_name' in df.columns:
+            df = df.dropna(subset=['player_name'])
+            df = df[df['player_name'].str.strip() != '']
+            
+        return df
+
+    def validate_player_contract_data(self, df: pd.DataFrame, year: int):
+        """Run data quality checks on player contract data"""
+        if df.empty:
+            raise DataQualityError(f"No contract data found for {year}")
+            
+        required = ['player_name', 'team', 'year']
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            raise DataQualityError(f"Missing required columns: {missing}")
+            
+        if 'player_name' in df.columns and df['player_name'].isnull().sum() > 0:
+            logger.warning(f"⚠️ Detected {df['player_name'].isnull().sum()} null player names")
+            
+        unique_teams = df['team'].nunique()
+        if unique_teams < 2:
+             raise DataQualityError(f"Expected at least one team, got {unique_teams}")
+
+    def normalize_team_cap_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
+        """Normalize column names and parse monetary values"""
+        col_map = {}
+        for col in df.columns:
+            col_lower = col.lower()
+            if 'team' in col_lower and 'team' not in col_map.values():
+                col_map[col] = 'team'
+            elif 'active' in col_lower and 'cap' in col_lower:
+                col_map[col] = 'active_cap'
+            elif 'dead' in col_lower and ('money' in col_lower or 'cap' in col_lower):
+                col_map[col] = 'dead_money'
+            elif 'total' in col_lower and 'cap' in col_lower:
+                col_map[col] = 'salary_cap'
+            elif 'space' in col_lower:
+                col_map[col] = 'cap_space'
+                
+        df = df.rename(columns=col_map)
+        df['year'] = year
+        
+        money_cols = ['active_cap', 'dead_money', 'salary_cap', 'cap_space']
+        for col in money_cols:
+            if col in df.columns:
+                df[f'{col}_millions'] = df[col].apply(self.parse_money)
+                
+        # Calculate dead cap %
+        if 'dead_money_millions' in df.columns and 'salary_cap_millions' in df.columns:
+            df['dead_cap_pct'] = (df['dead_money_millions'] / df['salary_cap_millions']) * 100
+        
+        # Keep only standardized columns
+        keep_cols = ['team', 'year', 'salary_cap_millions', 'active_cap_millions', 
+                     'dead_money_millions', 'cap_space_millions', 'dead_cap_pct']
+        df = df[[c for c in keep_cols if c in df.columns]]
+            
+        return df
+
+    def validate_team_cap_data(self, df: pd.DataFrame, year: int):
+        """Run data quality checks on team cap data"""
+        if len(df) < 30:
+            raise DataQualityError(f"Expected ≥30 team records, got {len(df)}")
+        required = ['team', 'year', 'salary_cap_millions']
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            raise DataQualityError(f"Missing required columns: {missing}")
+
+    def normalize_player_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
+        """Generic normalization for any player-related table."""
+        col_map = {}
+        mapped_targets = set()
+        
+        for col in df.columns:
+            col_lower = str(col).lower()
+            target = None
+            if ('player' in col_lower or 'name' in col_lower) and 'player_name' not in mapped_targets:
+                target = 'player_name'
+            elif 'team' in col_lower and 'avg' not in col_lower and 'team' not in mapped_targets:
+                target = 'team'
+            elif 'pos' in col_lower and 'position' not in mapped_targets:
+                target = 'position'
+            elif ('salary' in col_lower or 'compensation' in col_lower) and 'salary' not in mapped_targets:
+                target = 'salary'
+            elif 'cap' in col_lower and 'hit' in col_lower and 'cap_hit' not in mapped_targets:
+                target = 'cap_hit'
+            elif 'dead' in col_lower and 'money' in col_lower and 'dead_money' not in mapped_targets:
+                target = 'dead_money'
+            elif (('contract' in col_lower and 'value' in col_lower) or col_lower == 'value') and 'total_contract_value' not in mapped_targets:
+                target = 'total_contract_value'
+            elif ('guaranteed' in col_lower or 'guarantee' in col_lower) and 'guaranteed_money' not in mapped_targets:
+                target = 'guaranteed_money'
+            
+            if target:
+                col_map[col] = target
+                mapped_targets.add(target)
+                
+        df = df.rename(columns=col_map).copy()
+        
+        # Parse money
+        money_cols = ['salary', 'cap_hit', 'dead_money', 'total_contract_value', 'guaranteed_money']
+        for col in money_cols:
+            if col in df.columns:
+                df[f'{col}_millions'] = df[col].apply(self.parse_money)
+        
+        df['year'] = year
+        if 'player_name' in df.columns:
+            df = df.dropna(subset=['player_name'])
+            df = df[df['player_name'].str.strip() != '']
+            
+        return df
+
+    def validate_player_data(self, df: pd.DataFrame, year: int, min_rows: int = 50):
+        """Run data quality checks on player data"""
+        if len(df) < min_rows:
+            raise DataQualityError(f"Expected ≥{min_rows} players, got {len(df)}")
+        required = ['player_name', 'team', 'year']
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            raise DataQualityError(f"Missing columns: {missing}")
+
 class SpotracScraper:
     """
     Spotrac scraper with built-in data quality checks.
@@ -63,6 +360,8 @@ class SpotracScraper:
     def __init__(self, headless: bool = True):
         self.headless = headless
         self.driver = None
+        self.parser = SpotracParser()
+        self.snapshot_dir = Path("data/raw/snapshots")
         
     def __enter__(self):
         self._initialize_driver()
@@ -118,8 +417,15 @@ class SpotracScraper:
                 except:
                     pass
         self._initialize_driver()
-        
-    def scrape_team_cap(self, year: int) -> pd.DataFrame:
+
+    def save_snapshot(self, html: str, name: str):
+        """Save HTML snapshot for offline testing."""
+        self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+        path = self.snapshot_dir / f"{name}.html"
+        path.write_text(html)
+        logger.info(f"💾 Snapshot saved: {path}")
+
+    def scrape_team_cap(self, year: int, snapshot: bool = False) -> pd.DataFrame:
         """
         Scrape team cap data for a given year with quality checks.
         
@@ -152,85 +458,22 @@ class SpotracScraper:
             raise DataQualityError(f"Failed to load table: {e}")
             
         # Parse with BeautifulSoup
-        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-        
-        # Find the table with tbody (DataTables creates multiple table elements)
-        tables = soup.find_all('table', {'class': 'dataTable'})
-        table = None
-        for tbl in tables:
-            if tbl.find('tbody'):
-                table = tbl
-                break
-                
-        if not table:
-            raise DataQualityError("No dataTable with tbody found in page")
+        html = self.driver.page_source
+        if snapshot:
+            self.save_snapshot(html, f"team_cap_{year}")
+
+        headers, rows = self.parser.parse_table(html)
+        if not headers or not rows:
+            raise DataQualityError(f"No team cap data found for {year}")
             
-        # INGESTION QUALITY CHECK 1: Table structure
-        thead = table.find('thead')
-        tbody = table.find('tbody')
-        
-        if not tbody:
-            raise DataQualityError("Table missing tbody")
-            
-        # Extract headers
-        headers = []
-        if thead:
-            headers = [th.text.strip().replace('\n', ' ') for th in thead.find_all('th')]
-        else:
-            # Fallback: infer from first row
-            first_row = tbody.find('tr')
-            if first_row:
-                headers = [td.text.strip().replace('\n', ' ') for td in first_row.find_all(['th', 'td'])]
-                
-        logger.info(f"  Headers ({len(headers)}): {headers[:10]}")
-        
-        # Extract rows (skip totals row if present)
-        rows = []
-        for tr in tbody.find_all('tr'):
-            tds = tr.find_all('td')
-            if len(tds) < 5:
-                continue
-            # Extract text and clean team names
-            row = []
-            for td in tds:
-                text = td.text.strip().replace('\n', ' ')
-                # Clean team abbreviations (e.g., "SF  SF" -> "SF")
-                if len(text) > 5 and text.count(' ') >= 2:
-                    parts = text.split()
-                    if len(parts[0]) <= 3 and parts[0] == parts[-1]:
-                        text = parts[0]
-                row.append(text)
-            rows.append(row)
-            
-        # INGESTION QUALITY CHECK 2: Minimum row count
-        if len(rows) < 30:
-            raise DataQualityError(f"Expected ≥30 teams, got {len(rows)}")
-            
-        logger.info(f"  ✓ Extracted {len(rows)} team records")
-        
-        # Build DataFrame with header deduplication
-        # Handle case where DataFrame has duplicate column names
-        col_count = len(rows[0]) if rows else len(headers)
-        headers_to_use = headers[:col_count]
-        
-        # Deduplicate column names by appending suffixes
-        seen = {}
-        dedup_headers = []
-        for col in headers_to_use:
-            if col in seen:
-                seen[col] += 1
-                dedup_headers.append(f"{col}_{seen[col]}")
-            else:
-                seen[col] = 0
-                dedup_headers.append(col)
-        
-        df = pd.DataFrame(rows, columns=dedup_headers)
+        # Build DataFrame
+        df = pd.DataFrame(rows, columns=headers[:len(rows[0])])
         
         # TRANSFORMATION: Normalize columns
-        df = self._normalize_team_cap_df(df, year)
+        df = self.parser.normalize_team_cap_df(df, year)
         
         # TRANSFORMATION QUALITY CHECKS
-        self._validate_team_cap_data(df, year)
+        self.parser.validate_team_cap_data(df, year)
         
         logger.info(f"  ✓ All quality checks passed")
         return df
@@ -331,7 +574,7 @@ class SpotracScraper:
         logger.info(f"  ✓ Avg per team: ${total_dead_money/len(df):.1f}M")
 
 
-    def scrape_player_rankings(self, year: int) -> pd.DataFrame:
+    def scrape_player_rankings(self, year: int, snapshot: bool = False) -> pd.DataFrame:
         """
         Scrape player-level salary/cap hit data from Spotrac rankings page.
         Shows all NFL players ranked by salary cap hit for a given year.
@@ -392,72 +635,35 @@ class SpotracScraper:
             except Exception as js_err:
                 logger.warning(f"  JavaScript execution failed: {js_err}")
         
-        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+        # Parse with BeautifulSoup
+        html = self.driver.page_source
+        if snapshot:
+            self.save_snapshot(html, f"player_rankings_{year}")
+
+        # Try standard table parse first
+        headers, rows = self.parser.parse_table(html)
         
-        # Find any table - be flexible with table class names
-        tables = soup.find_all('table')
-        table = None
-        
-        # First try for dataTable class
-        for tbl in tables:
-            if 'dataTable' in tbl.get('class', []):
-                if tbl.find('tbody'):
-                    table = tbl
-                    break
-        
-        # If not found, use first table with tbody
-        if not table:
-            for tbl in tables:
-                if tbl.find('tbody'):
-                    table = tbl
-                    break
-                
-        if not table:
-            raise DataQualityError("No player rankings table found")
+        # Fallback to list-group parse if no table found
+        if not headers or not rows:
+            logger.info("  No table found, attempting to parse list-group structure...")
+            headers, rows = self.parser.parse_rankings_list_group(html)
             
-        tbody = table.find('tbody')
-        if not tbody:
-            raise DataQualityError("Table missing tbody")
+        if not headers or not rows:
+            raise DataQualityError(f"No player ranking data found for {year}")
             
-        # Extract headers
-        thead = table.find('thead')
-        headers = []
-        if thead:
-            headers = [th.text.strip().replace('\n', ' ') for th in thead.find_all('th')]
-        
-        logger.info(f"  Headers ({len(headers)}): {headers[:6]}")
-        
-        # Extract rows
-        rows = []
-        for tr in tbody.find_all('tr'):
-            tds = tr.find_all('td')
-            if len(tds) < 3:
-                continue
-            row = []
-            for td in tds:
-                text = td.text.strip().replace('\n', ' ')
-                row.append(text)
-            rows.append(row)
-            
-        # INGESTION QUALITY CHECK: Minimum row count
-        if len(rows) < 500:
-            raise DataQualityError(f"Expected ≥500 player records, got {len(rows)}")
-            
-        logger.info(f"  ✓ Extracted {len(rows)} player records")
-        
         # Build DataFrame
-        df = pd.DataFrame(rows, columns=headers[:len(rows[0]) if rows else 0])
+        df = pd.DataFrame(rows, columns=headers[:len(rows[0])])
         
         # TRANSFORMATION: Normalize columns
-        df = self._normalize_player_ranking_df(df, year)
+        df = self.parser.normalize_player_df(df, year)
         
         # TRANSFORMATION QUALITY CHECKS
-        self._validate_player_ranking_data(df, year)
+        self.parser.validate_player_data(df, year, min_rows=500)
         
         logger.info(f"  ✓ All quality checks passed")
         return df
 
-    def scrape_player_contracts(self, year: int, max_retries: int = 2, team_list: Optional[List[str]] = None) -> pd.DataFrame:
+    def scrape_player_contracts(self, year: int, max_retries: int = 2, team_list: Optional[List[str]] = None, snapshot: bool = False) -> pd.DataFrame:
         """
         Scrape player-level contract details from Spotrac team contracts pages.
         
@@ -592,81 +798,35 @@ class SpotracScraper:
                                 time.sleep(5)  # Wait before retry
                             continue
                     
-                    soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                    html = self.driver.page_source
+                    if snapshot:
+                        self.save_snapshot(html, f"player_contracts_{team_code}_{year}")
                     
-                    # Find contract table - try multiple selectors
-                    table = None
+                    headers, rows = self.parser.parse_table(html)
                     
-                    # First try dataTable class
-                    tables = soup.find_all('table', {'class': 'dataTable'})
-                    for tbl in tables:
-                        if tbl.find('tbody'):
-                            table = tbl
-                            break
-                    
-                    # Fallback: any table with tbody
-                    if not table:
-                        for tbl in soup.find_all('table'):
-                            if tbl.find('tbody'):
-                                table = tbl
-                                break
-                    
-                    if not table:
-                        logger.debug(f"    No contracts table found for {team_code}")
+                    if not headers or not rows:
+                        logger.warning(f"    No contracts table found for {team_code}")
                         if attempt < max_retries:
                             time.sleep(5)
                             continue
                         else:
                             break
-                    
-                    tbody = table.find('tbody')
-                    if not tbody:
-                        logger.warning(f"    ⚠️ Table missing tbody for {team_code}")
-                        if attempt < max_retries:
-                            time.sleep(5)
-                            continue
-                        else:
-                            break
-                    
-                    # Extract headers
-                    thead = table.find('thead')
-                    headers = []
-                    if thead:
-                        headers = [th.text.strip().replace('\n', ' ').lower() for th in thead.find_all('th')]
-                    
-                    # Deduplicate headers to avoid pandas InvalidIndexError
-                    if headers:
-                        headers = _deduplicate_headers(headers)
-                    
-                    # Extract rows
-                    rows = []
-                    for tr in tbody.find_all('tr'):
-                        tds = tr.find_all('td')
-                        if len(tds) < 2:
-                            continue
-                        row = []
-                        for td in tds:
-                            text = td.text.strip().replace('\n', ' ')
-                            row.append(text)
-                        if row:
-                            rows.append(row)
                     
                     logger.info(f"    ✓ Extracted {len(rows)} contracts for {team_code}")
                     
                     # Build team-specific DataFrame
-                    if rows and headers:
-                        df_team = pd.DataFrame(rows, columns=headers[:len(rows[0]) if rows else 0])
-                        df_team['team'] = team_code
-                        
-                        # Normalize per-team to ensure columns align before concat
-                        df_team = self._normalize_player_contract_df(df_team, year)
-                        
-                        all_contracts.append(df_team)
-                        successful_teams += 1
-                        success = True
+                    df_team = pd.DataFrame(rows, columns=headers[:len(rows[0])])
+                    df_team['team'] = team_code
                     
-                    time.sleep(2)  # Rate limiting between teams
-                    break  # Success, move to next team
+                    # Normalize per-team to ensure columns align before concat
+                    df_team = self.parser.normalize_player_contract_df(df_team, year)
+                    
+                    all_contracts.append(df_team)
+                    successful_teams += 1
+                    success = True
+                    
+                    time.sleep(2)
+                    break 
                     
                 except Exception as e:
                     logger.warning(f"  ⚠️ Exception on {team_code} attempt {attempt+1}: {e}")
@@ -699,12 +859,12 @@ class SpotracScraper:
         logger.info(f"  ✓ Total contracts collected: {len(df)} rows from {successful_teams}/{len(team_codes)} teams")
         
         # TRANSFORMATION QUALITY CHECKS
-        self._validate_player_contract_data(df, year)
+        self.parser.validate_player_contract_data(df, year)
         
         logger.info(f"  ✓ All quality checks passed")
         return df
 
-    def scrape_player_salaries(self, year: int) -> pd.DataFrame:
+    def scrape_player_salaries(self, year: int, snapshot: bool = False) -> pd.DataFrame:
         """
         Scrape player-level dead money data from Spotrac for a given year.
         
@@ -735,341 +895,27 @@ class SpotracScraper:
         except Exception as e:
             raise DataQualityError(f"Failed to load dead money table: {e}")
             
-        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-        
-        # Find table with tbody
-        tables = soup.find_all('table', {'class': 'dataTable'})
-        table = None
-        for tbl in tables:
-            if tbl.find('tbody'):
-                table = tbl
-                break
-                
-        if not table:
-            raise DataQualityError("No player dead money table found")
+        # Parse with BeautifulSoup
+        html = self.driver.page_source
+        if snapshot:
+            self.save_snapshot(html, f"player_salaries_{year}")
+
+        headers, rows = self.parser.parse_table(html)
+        if not headers or not rows:
+            raise DataQualityError(f"No player dead money data found for {year}")
             
-        tbody = table.find('tbody')
-        if not tbody:
-            raise DataQualityError("Table missing tbody")
-            
-        # Extract headers
-        thead = table.find('thead')
-        headers = []
-        if thead:
-            headers = [th.text.strip().replace('\n', ' ') for th in thead.find_all('th')]
-        
-        logger.info(f"  Headers ({len(headers)}): {headers[:6]}")
-        
-        # Extract rows
-        rows = []
-        for tr in tbody.find_all('tr'):
-            tds = tr.find_all('td')
-            if len(tds) < 3:
-                continue
-            row = []
-            for td in tds:
-                text = td.text.strip().replace('\n', ' ')
-                row.append(text)
-            rows.append(row)
-            
-        # INGESTION QUALITY CHECK: Minimum row count
-        if len(rows) < 50:
-            raise DataQualityError(f"Expected ≥50 player records, got {len(rows)}")
-            
-        logger.info(f"  ✓ Extracted {len(rows)} player records")
-        
         # Build DataFrame
-        df = pd.DataFrame(rows, columns=headers[:len(rows[0]) if rows else 0])
+        df = pd.DataFrame(rows, columns=headers[:len(rows[0])])
         
         # TRANSFORMATION: Normalize columns
-        df = self._normalize_player_dead_money_df(df, year)
+        df = self.parser.normalize_player_df(df, year)
         
         # TRANSFORMATION QUALITY CHECKS
-        self._validate_player_dead_money_data(df, year)
+        self.parser.validate_player_data(df, year, min_rows=50)
         
         logger.info(f"  ✓ All quality checks passed")
         return df
         
-    def _normalize_player_salary_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
-        """Normalize player salary columns"""
-        
-        # Rename columns
-        col_map = {}
-        for col in df.columns:
-            col_lower = col.lower()
-            if 'player' in col_lower or 'name' in col_lower:
-                col_map[col] = 'player_name'
-            elif 'team' in col_lower and 'avg' not in col_lower:
-                col_map[col] = 'team'
-            elif 'pos' in col_lower:
-                col_map[col] = 'position'
-            elif 'salary' in col_lower or 'compensation' in col_lower:
-                col_map[col] = 'salary'
-            elif 'cap' in col_lower and 'hit' in col_lower:
-                col_map[col] = 'cap_hit'
-            elif 'dead' in col_lower:
-                col_map[col] = 'dead_money'
-                
-        df = df.rename(columns=col_map)
-        
-        # Parse money columns
-        money_cols = ['salary', 'cap_hit', 'dead_money']
-        for col in money_cols:
-            if col in df.columns:
-                df[f'{col}_millions'] = df[col].apply(self._parse_money)
-                
-        # Add year
-        df['year'] = year
-        
-        # Keep only useful columns
-        keep_cols = ['player_name', 'team', 'position', 'year', 
-                     'salary_millions', 'cap_hit_millions', 'dead_money_millions']
-        df = df[[c for c in keep_cols if c in df.columns]]
-        
-        return df
-
-    def _normalize_player_ranking_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
-        """Normalize player ranking columns from rankings page"""
-        
-        # Rename columns - rankings page has different structure
-        col_map = {}
-        for col in df.columns:
-            col_lower = col.lower()
-            if 'rank' in col_lower:
-                col_map[col] = 'rank'
-            elif 'player' in col_lower or 'name' in col_lower:
-                col_map[col] = 'player_name'
-            elif 'team' in col_lower and 'avg' not in col_lower:
-                col_map[col] = 'team'
-            elif 'pos' in col_lower:
-                col_map[col] = 'position'
-            elif 'salary' in col_lower or 'compensation' in col_lower:
-                col_map[col] = 'salary'
-            elif 'cap' in col_lower and 'hit' in col_lower:
-                col_map[col] = 'cap_hit'
-            elif 'dead' in col_lower:
-                col_map[col] = 'dead_money'
-                
-        df = df.rename(columns=col_map)
-        
-        # Parse money columns
-        money_cols = ['salary', 'cap_hit', 'dead_money']
-        for col in money_cols:
-            if col in df.columns:
-                df[f'{col}_millions'] = df[col].apply(self._parse_money)
-                
-        # Add year
-        df['year'] = year
-        
-        # Keep only useful columns
-        keep_cols = ['player_name', 'team', 'position', 'year', 
-                     'salary_millions', 'cap_hit_millions', 'dead_money_millions']
-        df = df[[c for c in keep_cols if c in df.columns]]
-        
-        return df
-
-    def _normalize_player_contract_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
-        """Normalize contract columns from team contracts pages"""
-        
-        # Rename columns - look for common contract-related headers
-        col_map = {}
-        mapped_targets = set()
-        
-        # Priority order for mapping: we want to map each source column to at most one target name
-        # and each target name should only be used once.
-        for col in df.columns:
-            col_lower = col.lower()
-            target = None
-            if ('player' in col_lower or 'name' in col_lower) and 'player_name' not in mapped_targets:
-                target = 'player_name'
-            elif 'team' in col_lower and 'avg' not in col_lower and 'team' not in mapped_targets:
-                target = 'team'
-            elif 'pos' in col_lower and 'position' not in mapped_targets:
-                target = 'position'
-            elif (('contract' in col_lower and 'value' in col_lower) or col_lower == 'value') and 'total_contract_value' not in mapped_targets:
-                target = 'total_contract_value'
-            elif ('guaranteed' in col_lower or 'guarantee' in col_lower) and 'guaranteed_money' not in mapped_targets:
-                target = 'guaranteed_money'
-            elif 'signing' in col_lower and 'bonus' in col_lower and 'signing_bonus' not in mapped_targets:
-                target = 'signing_bonus'
-            elif 'contract' in col_lower and 'year' in col_lower and 'contract_length_years' not in mapped_targets:
-                target = 'contract_length_years'
-            elif 'years' in col_lower and 'remaining' in col_lower and 'years_remaining' not in mapped_targets:
-                target = 'years_remaining'
-            elif 'cap' in col_lower and 'hit' in col_lower and 'cap_hit' not in mapped_targets:
-                target = 'cap_hit'
-            elif 'dead' in col_lower and 'cap' in col_lower and 'dead_cap' not in mapped_targets:
-                target = 'dead_cap'
-            
-            if target:
-                col_map[col] = target
-                mapped_targets.add(target)
-                
-        df = df.rename(columns=col_map)
-        
-        # Parse money columns
-        money_cols = ['total_contract_value', 'guaranteed_money', 'signing_bonus', 'cap_hit', 'dead_cap']
-        for col in money_cols:
-            if col in df.columns:
-                df[f'{col}_millions'] = df[col].apply(self._parse_money)
-        
-        # Parse numeric columns
-        numeric_cols = ['contract_length_years', 'years_remaining']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Add year
-        df['year'] = year
-        
-        # Keep only useful columns
-        keep_cols = ['player_name', 'team', 'position', 'year',
-                     'total_contract_value_millions', 'guaranteed_money_millions', 
-                     'signing_bonus_millions', 'contract_length_years', 'years_remaining',
-                     'cap_hit_millions', 'dead_cap_millions']
-        df = df[[c for c in keep_cols if c in df.columns]]
-        
-        # Clean up: Drop rows with no player name
-        if 'player_name' in df.columns:
-            df = df.dropna(subset=['player_name'])
-            df = df[df['player_name'].str.strip() != '']
-            
-        return df
-        
-    def _validate_player_salary_data(self, df: pd.DataFrame, year: int):
-        """Run data quality checks on player salary data"""
-        
-        # Check 1: Minimum records
-        if len(df) < 100:
-            raise DataQualityError(f"Expected ≥100 players, got {len(df)}")
-            
-        # Check 2: Required columns
-        required = ['player_name', 'team', 'year']
-        missing = [c for c in required if c not in df.columns]
-        if missing:
-            raise DataQualityError(f"Missing columns: {missing}")
-            
-        # Check 3: No nulls in key columns
-        if df['player_name'].isnull().sum() > 0:
-            raise DataQualityError("player_name has nulls")
-            
-        # Check 4: Value ranges (if cap_hit data present)
-        if 'cap_hit_millions' in df.columns:
-            max_cap = df['cap_hit_millions'].max()
-            min_cap = df['cap_hit_millions'].min()
-            
-            if max_cap > 100:  # Individual player cap hit shouldn't exceed ~$100M
-                raise DataQualityError(f"Unreasonable max cap hit: ${max_cap}M")
-                
-            if min_cap < 0:
-                raise DataQualityError("Negative cap hit values detected")
-        
-        # Check 5: Reasonable totals
-        if 'cap_hit_millions' in df.columns:
-            total_cap = df['cap_hit_millions'].sum()
-            if total_cap < 1000 or total_cap > 50000:
-                logger.warning(f"⚠️ Total cap hit ${total_cap:.1f}M seems unusual (expected ~6000-8000M)")
-        
-        # Check 6: Team coverage (should have multiple teams)
-        unique_teams = df['team'].nunique()
-        if unique_teams < 15:
-            raise DataQualityError(f"Only {unique_teams} unique teams (expected ≥20)")
-            
-        logger.info(f"  ✓ Teams covered: {unique_teams}")
-        if 'cap_hit_millions' in df.columns:
-            total_cap = df['cap_hit_millions'].sum()
-            logger.info(f"  ✓ Total league cap hit: ${total_cap:.1f}M")
-
-    def _validate_player_ranking_data(self, df: pd.DataFrame, year: int):
-        """Run data quality checks on player ranking data"""
-        
-        # Check 1: Minimum records (should have many players)
-        if len(df) < 500:
-            raise DataQualityError(f"Expected ≥500 players, got {len(df)}")
-            
-        # Check 2: Required columns
-        required = ['player_name', 'team', 'year']
-        missing = [c for c in required if c not in df.columns]
-        if missing:
-            raise DataQualityError(f"Missing columns: {missing}")
-            
-        # Check 3: No nulls in key columns
-        if df['player_name'].isnull().sum() > 0:
-            raise DataQualityError("player_name has nulls")
-            
-        # Check 4: Value ranges (if cap_hit data present)
-        if 'cap_hit_millions' in df.columns:
-            max_cap = df['cap_hit_millions'].max()
-            min_cap = df['cap_hit_millions'].min()
-            
-            if max_cap > 100:  # Individual player cap hit shouldn't exceed ~$100M
-                raise DataQualityError(f"Unreasonable max cap hit: ${max_cap}M")
-                
-            if min_cap < 0:
-                raise DataQualityError("Negative cap hit values detected")
-        
-        # Check 5: Reasonable totals
-        if 'cap_hit_millions' in df.columns:
-            total_cap = df['cap_hit_millions'].sum()
-            if total_cap < 1000 or total_cap > 50000:
-                logger.warning(f"⚠️ Total cap hit ${total_cap:.1f}M seems unusual (expected ~6000-8000M)")
-        
-        # Check 6: Team coverage (should have multiple teams)
-        unique_teams = df['team'].nunique()
-        # Only enforce high team count if we didn't specify a team list
-        if unique_teams < 2 and len(df) > 0: # Basic check
-             raise DataQualityError(f"Expected at least one team, got {unique_teams}")
-             
-        if unique_teams < 25:
-            logger.warning(f"⚠️ Only {unique_teams} unique teams (expected ≥25 for full scrape)")
-            
-        logger.info(f"  ✓ Teams covered: {unique_teams}")
-        logger.info(f"  ✓ Players recorded: {len(df)}")
-        if 'cap_hit_millions' in df.columns:
-            total_cap = df['cap_hit_millions'].sum()
-            logger.info(f"  ✓ Total league cap hit: ${total_cap:.1f}M")
-
-    def _validate_player_contract_data(self, df: pd.DataFrame, year: int):
-        """Run data quality checks on player contract data"""
-        
-        # Check 1: Minimum records
-        if len(df) < 500:
-            logger.warning(f"⚠️ Expected ≥500 player contracts, got {len(df)}")
-            
-        # Check 2: Required columns
-        required = ['player_name', 'team', 'year']
-        missing = [c for c in required if c not in df.columns]
-        if missing:
-            raise DataQualityError(f"Missing required columns: {missing}")
-            
-        # Check 3: No nulls in critical columns
-        if 'player_name' in df.columns and df['player_name'].isnull().sum() > 0:
-            logger.warning(f"⚠️ Detected {df['player_name'].isnull().sum()} null player names, dropping...")
-            df = df.dropna(subset=['player_name'])
-            
-        # Check 4: Team coverage
-        unique_teams = df['team'].nunique()
-        if unique_teams < 2:
-             raise DataQualityError(f"Expected at least one team, got {unique_teams}")
-             
-        if unique_teams < 25:
-            logger.warning(f"⚠️ Only {unique_teams} unique teams (expected ≥25 for full scrape)")
-        
-        # Check 5: Guaranteed money ranges (if present)
-        if 'guaranteed_money_millions' in df.columns:
-            max_guaranteed = df['guaranteed_money_millions'].max()
-            if max_guaranteed > 200:
-                logger.warning(f"⚠️ Max guaranteed money ${max_guaranteed}M is very high")
-        
-        # Check 6: Signing bonus ranges (if present)
-        if 'signing_bonus_millions' in df.columns:
-            max_bonus = df['signing_bonus_millions'].max()
-            if max_bonus > 100:
-                logger.warning(f"⚠️ Max signing bonus ${max_bonus}M is very high")
-        
-        logger.info(f"  ✓ Teams covered: {unique_teams}")
-        logger.info(f"  ✓ Contracts recorded: {len(df)}")
-        logger.info(f"  ✓ Year: {year}")
 
 
 def scrape_and_save_team_cap(
@@ -1077,6 +923,7 @@ def scrape_and_save_team_cap(
     output_dir: str = 'data/raw',
     run_timestamp: Optional[datetime] = None,
     iso_week_tag: Optional[str] = None,
+    snapshot: bool = False,
 ) -> Path:
     """
     Scrape team cap data and save to CSV with timestamp.
@@ -1093,7 +940,7 @@ def scrape_and_save_team_cap(
     filepath = output_path / filename
     
     with SpotracScraper(headless=True) as scraper:
-        df = scraper.scrape_team_cap(year)
+        df = scraper.scrape_team_cap(year, snapshot=snapshot)
         df.to_csv(filepath, index=False)
         
     logger.info(f"✓ Saved {len(df)} records to {filepath}")
@@ -1107,6 +954,7 @@ def scrape_and_save_player_contracts(
     run_timestamp: Optional[datetime] = None,
     iso_week_tag: Optional[str] = None,
     team_list: Optional[List[str]] = None,
+    snapshot: bool = False,
 ) -> Path:
     """
     Scrape player contract data and save to CSV with timestamp.
@@ -1123,7 +971,7 @@ def scrape_and_save_player_contracts(
     filepath = output_path / filename
     
     with SpotracScraper(headless=True) as scraper:
-        df = scraper.scrape_player_contracts(year, team_list=team_list)
+        df = scraper.scrape_player_contracts(year, team_list=team_list, snapshot=snapshot)
         df.to_csv(filepath, index=False)
         
     logger.info(f"✓ Saved {len(df)} records to {filepath}")
@@ -1136,6 +984,7 @@ def scrape_and_save_player_salaries(
     output_dir: str = 'data/raw',
     run_timestamp: Optional[datetime] = None,
     iso_week_tag: Optional[str] = None,
+    snapshot: bool = False,
 ) -> Path:
     """
     Scrape player salary data and save to CSV with timestamp.
@@ -1152,7 +1001,7 @@ def scrape_and_save_player_salaries(
     filepath = output_path / filename
     
     with SpotracScraper(headless=True) as scraper:
-        df = scraper.scrape_player_salaries(year)
+        df = scraper.scrape_player_salaries(year, snapshot=snapshot)
         df.to_csv(filepath, index=False)
         
     logger.info(f"✓ Saved {len(df)} records to {filepath}")
@@ -1165,6 +1014,7 @@ def scrape_and_save_player_rankings(
     output_dir: str = 'data/raw',
     run_timestamp: Optional[datetime] = None,
     iso_week_tag: Optional[str] = None,
+    snapshot: bool = False,
 ) -> Path:
     """
     Scrape player rankings (cap hit) data and save to CSV with timestamp.
@@ -1181,7 +1031,7 @@ def scrape_and_save_player_rankings(
     filepath = output_path / filename
     
     with SpotracScraper(headless=True) as scraper:
-        df = scraper.scrape_player_rankings(year)
+        df = scraper.scrape_player_rankings(year, snapshot=snapshot)
         df.to_csv(filepath, index=False)
         
     logger.info(f"✓ Saved {len(df)} records to {filepath}")
@@ -1197,6 +1047,7 @@ if __name__ == '__main__':
     parser.add_argument('task', choices=['team-cap', 'player-salaries', 'player-rankings', 'player-contracts'], help='Scraping task to perform')
     parser.add_argument('year', type=int, help='Year to scrape')
     parser.add_argument('--teams', nargs='+', help='Subset of team codes to scrape (e.g., ARI ATL)')
+    parser.add_argument('--snapshot', action='store_true', help='Save HTML snapshots')
     
     args = parser.parse_args()
     
@@ -1204,22 +1055,23 @@ if __name__ == '__main__':
     
     try:
         if args.task == 'team-cap':
-            filepath = scrape_and_save_team_cap(args.year, run_timestamp=run_timestamp)
+            filepath = scrape_and_save_team_cap(args.year, run_timestamp=run_timestamp, snapshot=args.snapshot)
             print(f"\n✅ SUCCESS: Team cap data saved to {filepath}")
             
         elif args.task == 'player-salaries':
-            filepath = scrape_and_save_player_salaries(args.year, run_timestamp=run_timestamp)
+            filepath = scrape_and_save_player_salaries(args.year, run_timestamp=run_timestamp, snapshot=args.snapshot)
             print(f"\n✅ SUCCESS: Player salary data saved to {filepath}")
             
         elif args.task == 'player-rankings':
-            filepath = scrape_and_save_player_rankings(args.year, run_timestamp=run_timestamp)
+            filepath = scrape_and_save_player_rankings(args.year, run_timestamp=run_timestamp, snapshot=args.snapshot)
             print(f"\n✅ SUCCESS: Player rankings data saved to {filepath}")
             
         elif args.task == 'player-contracts':
             filepath = scrape_and_save_player_contracts(
                 args.year, 
                 run_timestamp=run_timestamp, 
-                team_list=args.teams
+                team_list=args.teams,
+                snapshot=args.snapshot
             )
             print(f"\n✅ SUCCESS: Player contract data saved to {filepath}")
             
