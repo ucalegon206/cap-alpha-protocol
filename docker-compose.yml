@@ -1,0 +1,10 @@
+services:
+  scraper:
+    build: .
+    volumes:
+      - .:/app
+    # shm_size is important for Chrome to avoid crashing on memory constrained environments
+    shm_size: '2gb' 
+    environment:
+      - PYTHONPATH=/app
+    command: tail -f /dev/null # Keep alive for exec

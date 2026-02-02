@@ -75,6 +75,10 @@ class PFRRosterScraper:
             except Exception as e:
                 logger.warning(f"  ✗ {team_code}: {e}")
                 continue
+            
+            # Rate Limit (PFR requires < 20 req/min => > 3s/req)
+            import time
+            time.sleep(4.5)
         
         if not all_rosters:
             raise Exception("Failed to scrape any rosters")

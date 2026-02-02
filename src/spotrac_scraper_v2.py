@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 import time
 from datetime import datetime
+from src.config import DATA_RAW_DIR
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -143,22 +144,9 @@ class SpotracParser:
             rank_span = item.find('span', class_='rank-value') 
             rank = rank_span.text.strip() if rank_span else str(len(rows) + 1)
             
-            # Age Heuristic: Look for a 2-digit number in the text that isn't rank or part of value
-            # Typical text: "1 Patrick Mahomes KC, QB 29 $59,800,000"
-            # We already have rank, value_str, team_str, pos_str.
-            # Let's extract all numbers from text and find the one that fits Age profile (20-48).
-            
-            import re
-            full_text = item.get_text(" ", strip=True) 
-            # Replace known parts to isolate Age
-            temp_text = full_text.replace(rank, "").replace(value_str, "").replace(team_str, "").replace(pos_str, "")
-            # Find integers
-            candidates = re.findall(r'\b\d{2}\b', temp_text)
+            # Age is not present in the list-group structure
             age = ""
-            for c in candidates:
-                if 20 <= int(c) <= 48:
-                    age = c
-                    break
+
             
             # Construct row: [Rank, Player, Team, Pos, Age, Value]
             rows.append([rank, player_name, team_str, pos_str, age, value_str])
@@ -215,6 +203,8 @@ class SpotracParser:
                 target = 'cap_hit'
             elif 'dead' in col_lower and 'cap' in col_lower and 'dead_cap' not in mapped_targets:
                 target = 'dead_cap'
+            elif 'age' in col_lower and 'age' not in mapped_targets:
+                target = 'age'
             
             if target:
                 col_map[col] = target
@@ -227,9 +217,13 @@ class SpotracParser:
         for col in money_cols:
             if col in df.columns:
                 df[f'{col}_millions'] = df[col].apply(self.parse_money)
+                
+        # Parse Age (ensure numeric, handle missing)
+        if 'age' in df.columns:
+             df['age'] = pd.to_numeric(df['age'], errors='coerce')
         
         df['year'] = year
-        keep_cols = ['player_name', 'team', 'position', 'year',
+        keep_cols = ['player_name', 'team', 'position', 'age', 'year',
                      'total_contract_value_millions', 'guaranteed_money_millions', 
                      'signing_bonus_millions', 'contract_length_years', 'years_remaining',
                      'cap_hit_millions', 'dead_cap_millions']
@@ -255,7 +249,7 @@ class SpotracParser:
             logger.warning(f"⚠️ Detected {df['player_name'].isnull().sum()} null player names")
             
         unique_teams = df['team'].nunique()
-        if unique_teams < 2:
+        if unique_teams < 1:
              raise DataQualityError(f"Expected at least one team, got {unique_teams}")
 
     def normalize_team_cap_df(self, df: pd.DataFrame, year: int) -> pd.DataFrame:
@@ -373,7 +367,7 @@ class SpotracScraper:
         self.headless = headless
         self.driver = None
         self.parser = SpotracParser()
-        self.snapshot_dir = Path("data/raw/snapshots")
+        self.snapshot_dir = DATA_RAW_DIR / "snapshots"
         
     def __enter__(self):
         self._initialize_driver()
@@ -407,11 +401,34 @@ class SpotracScraper:
         options.add_argument("--disable-component-extensions-with-background-pages")
         options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
         
-        # Memory management
-        options.add_argument("--memory-pressure-off")
-        options.add_argument("--disable-renderer-backgrounding")
+        # Browser settings
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--start-maximized")
+        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-popup-blocking")
         
-        self.driver = webdriver.Chrome(options=options)
+        # Memory management
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        
+        import os
+        chrome_bin = os.environ.get("CHROME_BIN")
+        if chrome_bin:
+            options.binary_location = chrome_bin
+            from selenium.webdriver.chrome.service import Service as ChromeService
+            # If we are in docker, we expect chromium-driver to be at /usr/bin/chromium-driver
+            # but we can try without explicit service path first if it's in PATH
+            service_path = os.environ.get("CHROMEDRIVER_BIN", "/usr/bin/chromium-driver")
+            if os.path.exists(service_path):
+                self.driver = webdriver.Chrome(service=ChromeService(service_path), options=options)
+            else:
+                self.driver = webdriver.Chrome(options=options)
+        else:
+            from selenium.webdriver.chrome.service import Service as ChromeService
+            from webdriver_manager.chrome import ChromeDriverManager
+            self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+            
         logger.info("✓ Selenium driver initialized")
         
     def _ensure_driver(self):

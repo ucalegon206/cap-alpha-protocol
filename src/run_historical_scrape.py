@@ -27,11 +27,32 @@ def scrape_spotrac_year(year: int, force: bool = False):
     try:
         with SpotracScraper(headless=True) as scraper:
             df = scraper.scrape_player_rankings(year)
-            
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             outfile = f"data/raw/spotrac_player_rankings_{year}_{timestamp}.csv"
             df.to_csv(outfile, index=False)
-            logger.info(f"Saved {len(df)} records to {outfile}")
+            logger.info(f"Saved {len(df)} rankings to {outfile}")
+
+            # Scrape Contracts (for Age and Details)
+            try:
+                msg = f"Starting Contracts Scrape for {year}..."
+                logger.info(msg)
+                df_con = scraper.scrape_player_contracts(year)
+                outfile_con = f"data/raw/spotrac_player_contracts_{year}_{timestamp}.csv"
+                df_con.to_csv(outfile_con, index=False)
+                logger.info(f"Saved {len(df_con)} contracts to {outfile_con}")
+            except Exception as e:
+                logger.error(f"Contracts scrape warning: {e}")
+
+            # Scrape Dead Money (for accurate cap hit/dead cap breakdown)
+            try:
+                msg = f"Starting Dead Money Scrape for {year}..."
+                logger.info(msg)
+                df_dead = scraper.scrape_player_salaries(year)
+                outfile_dead = f"data/raw/spotrac_player_salaries_{year}_{timestamp}.csv"
+                df_dead.to_csv(outfile_dead, index=False)
+                logger.info(f"Saved {len(df_dead)} dead money records to {outfile_dead}")
+            except Exception as e:
+                logger.error(f"Dead Money scrape warning: {e}")
             
     except Exception as e:
         logger.error(f"Spotrac Scrape failed for {year}: {e}")

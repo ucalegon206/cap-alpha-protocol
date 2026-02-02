@@ -47,11 +47,19 @@ with DAG(
             bash_command=f'python /opt/airflow/dags/repo/src/run_historical_scrape.py --year {yr} --source spotrac --force'
         )
         scrape_spotrac_tasks.append(t)
+
+    # Task 2b: Scrape Detailed Contract Structure (Current Year) [NEW]
+    # This fetches Guarantees/Dead Cap Structure
+    scrape_details = BashOperator(
+        task_id=f'scrape_contract_details_{current_year}',
+        bash_command=f'python /opt/airflow/dags/repo/src/run_contract_details_scrape.py --year {current_year}'
+    )
         
-    # Task 3: Run ETL (All Years)
-    run_etl = BashOperator(
-        task_id='run_etl_transform',
-        bash_command='python /opt/airflow/dags/repo/src/etl_transform.py'
+    # Task 3: Run Canonical Timeline Build (Replaces legacy ETL)
+    # Builds 'canonical_player_timeline.parquet'
+    run_timeline = BashOperator(
+        task_id='build_canonical_timeline',
+        bash_command='python /opt/airflow/dags/repo/src/player_timeline.py'
     )
     
     # Task 4: Reporting
@@ -62,8 +70,9 @@ with DAG(
 
     # Dependencies
     # Scrapers run in parallel
-    scrape_pfr_current >> run_etl
+    scrape_pfr_current >> run_timeline
+    scrape_details >> run_timeline
     for t in scrape_spotrac_tasks:
-        t >> run_etl
+        t >> run_timeline
         
-    run_etl >> run_report
+    run_timeline >> run_report

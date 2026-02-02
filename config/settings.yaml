@@ -1,0 +1,14 @@
+project:
+  name: "nfl-dead-money"
+  version: "2.0.0"
+
+paths:
+  data_raw: "data_raw"
+  data_processed: "data_processed"
+  models: "models"
+  reports: "reports"
+  viz: "viz"
+
+scrapers:
+  spotrac_base_url: "https://www.spotrac.com/nfl"
+  pfr_base_url: "https://www.pro-football-reference.com"

@@ -4,13 +4,14 @@ import numpy as np
 from pathlib import Path
 import glob
 import logging
+from src.config import DATA_RAW_DIR, DATA_PROCESSED_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Constants
 YEARS = range(2015, 2027) # 2015-2026 (includes future)
-OUTPUT_DIR = Path("data/processed")
+OUTPUT_DIR = DATA_PROCESSED_DIR
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_FILE = OUTPUT_DIR / "nfl_master_table.csv"
 
@@ -24,13 +25,21 @@ CAP_HISTORY = {
 def clean_name(name):
     if pd.isna(name): return ""
     name = str(name).replace(" Jr.", "").replace(" Sr.", "").replace(" III", "").replace(" II", "")
-    return name.strip().lower()
+    name_clean = name.strip().lower()
+    
+    # Fix: Spotrac Contracts often have "Lastname Firstname Lastname" (e.g. "Allen Josh Allen")
+    # Heuristic: If first word equals last word, remove first word
+    parts = name_clean.split()
+    if len(parts) >= 3 and parts[0] == parts[-1]:
+        return " ".join(parts[1:])
+        
+    return name_clean
 
 def load_spotrac():
     logger.info("Loading Spotrac Financials...")
     dfs = []
     for year in YEARS:
-        pattern = f"data/raw/spotrac_player_rankings_{year}_*.csv"
+        pattern = str(DATA_RAW_DIR / f"spotrac_player_rankings_{year}_*.csv")
         files = glob.glob(pattern)
         if files:
             latest = sorted(files)[-1]
@@ -49,6 +58,46 @@ def load_spotrac():
         return pd.DataFrame()
     
     fin = pd.concat(dfs, ignore_index=True)
+
+    # Normalize Columns (Required for join)
+    fin['clean_name'] = fin['player_name'].apply(clean_name)
+
+    # ---------------------------------------------------------
+    # LOAD CONTRACTS (Canonical Age Source)
+    # ---------------------------------------------------------
+    logger.info("Loading Spotrac Contracts (for Age)...")
+    contract_dfs = []
+    for year in YEARS:
+        pattern = str(DATA_RAW_DIR / f"spotrac_player_contracts_{year}_*.csv")
+        files = glob.glob(pattern)
+        if files:
+            latest = sorted(files)[-1]
+            try:
+                cdf = pd.read_csv(latest)
+                cdf['year'] = year
+                contract_dfs.append(cdf)
+            except Exception as e:
+                logger.warning(f"Failed to read contracts {latest}: {e}")
+
+    if contract_dfs:
+        contracts = pd.concat(contract_dfs, ignore_index=True)
+        # Normalize name for join
+        contracts['clean_name'] = contracts['player_name'].apply(clean_name)
+        
+        # Prepare Age Lookup: clean_name + year -> age
+        # Prepare Age Lookup: clean_name + year -> age
+        # Deduplicate: take max age if duplicates (safety)
+        age_lookup = contracts.dropna(subset=['age']).groupby(['clean_name', 'year'])['age'].max().reset_index()
+        
+        # Merge Age into Ranking Data
+        rows_before = len(fin)
+        fin = pd.merge(fin, age_lookup, on=['clean_name', 'year'], how='left', suffixes=('', '_contract'))
+        
+        # Override corrupted/missing rankings age with contract age
+        if 'age_contract' in fin.columns:
+            fin['age'] = fin['age_contract'].fillna(fin.get('age', np.nan))
+    # ---------------------------------------------------------
+
     
     # Normalize Columns
     fin['clean_name'] = fin['player_name'].apply(clean_name)
@@ -114,7 +163,7 @@ def load_pfr():
     perf_years = range(2015, 2025)
     
     for year in perf_years:
-        log_file = f"data/raw/pfr/game_logs_{year}.csv"
+        log_file = DATA_RAW_DIR / "pfr" / f"game_logs_{year}.csv"
         if Path(log_file).exists():
             try:
                 logs = pd.read_csv(log_file)
