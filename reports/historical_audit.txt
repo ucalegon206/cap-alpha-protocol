@@ -1,0 +1,87 @@
+
+==================== 2017 SEASON AUDIT ====================
+🏆 Top 10 'High Value' Players (2017) - High Production, Low Cap Hit
+--------------------------------------------------------------------------------
+    player_name team position  cap_hit_millions  fair_market_value  ied_overpayment  value_metric_proxy
+   Dak Prescott  DAL       QB          0.635848            167.058      -166.422152          553.670060
+Jacoby Brissett  IND       QB          0.580038            121.644      -121.063962          465.314341
+    Josh McCown  CLE       QB          0.666667            137.700      -137.033333          435.749782
+ Trevor Siemian  DEN       QB          0.628195             90.216       -89.587805          316.143873
+  DeShone Kizer  CLE       QB          0.899712            117.234      -116.334288          290.815283
+  Brett Hundley   GB       QB          0.670908             77.688       -77.017092          256.070877
+    Kareem Hunt   KC       RB          0.658988             71.676       -71.017012          235.360887
+   Alvin Kamara   NO       RB          0.708193             74.772       -74.063807          219.855322
+  Jordan Howard  CHI       RB          0.602005             54.846       -54.243995          193.270820
+   Alex Collins  BAL       RB          0.508235             42.480       -41.971765          184.953811
+
+☢️ 'The Time Bombs' - Highest EDCE (Dead Cap Risk) (2017)
+--------------------------------------------------------------------------------
+                   player_name team position  age  potential_dead_cap_millions  edce_risk
+                     Tom Brady   NE       QB 40.0                    26.000000  25.825986
+                    Drew Brees   NO       QB 38.0                    12.000000  11.430890
+                   Eli Manning  NYG       QB 36.0                    12.400000   9.065126
+                 Carson Palmer  ARI       QB 38.0                     8.500000   8.096880
+                  Jason Peters  PHI       LT 35.0                     7.333332   6.985542
+               Michael Bennett  SEA       ED 32.0                     7.475000   6.583958
+                 Philip Rivers  LAC       QB 36.0                     9.000000   6.579527
+            Ben Roethlisberger  PIT       QB 35.0                    12.400000   6.200000
+Matthews Jr. Clay Matthews Jr.   GB       ED 31.0                     8.200000   5.994680
+                   Josh McCown  NYJ       QB 38.0                     6.000000   5.715445
+
+==================== 2018 SEASON AUDIT ====================
+🏆 Top 10 'High Value' Players (2018) - High Production, Low Cap Hit
+--------------------------------------------------------------------------------
+    player_name team position  cap_hit_millions  fair_market_value  ied_overpayment  value_metric_proxy
+   Dak Prescott  DAL       QB          0.725848            176.220      -175.494152          520.081339
+    Tyreek Hill   KC       WR          0.704996             76.140       -75.435004          226.242418
+    Kareem Hunt   KC       RB          0.642885             72.036       -71.393115          224.145843
+   Alvin Kamara   NO       RB          0.878193             93.456       -92.577807          213.620468
+   James Conner  PIT       RB          0.754572             73.260       -72.505428          200.776069
+    Aaron Jones   GB       RB          0.519369             49.212       -48.692631          193.889123
+Adrian Peterson  WAS       RB          0.630000             51.300       -50.670000          175.396825
+    Marlon Mack  IND       RB          0.659912             54.198       -53.538088          167.522336
+  George Kittle   SF       TE          0.629571             42.966       -42.336429          157.805871
+    Tarik Cohen  CHI       RB          0.713914             53.460       -52.746086          157.582006
+
+☢️ 'The Time Bombs' - Highest EDCE (Dead Cap Risk) (2018)
+--------------------------------------------------------------------------------
+       player_name team position  age  potential_dead_cap_millions  edce_risk
+        Drew Brees   NO       QB 39.0                    21.000000  20.622290
+         Tom Brady   NE       QB 41.0                    14.000000  13.965383
+        Greg Olsen  CAR       TE 33.0                    13.400000  12.764493
+     Aaron Rodgers   GB       QB 35.0                    23.000000  11.500000
+       Eli Manning  NYG       QB 37.0                    12.400000  10.921884
+       Josh McCown  NYJ       QB 39.0                    10.000000   9.820138
+Ben Roethlisberger  PIT       QB 36.0                    12.400000   9.065126
+     Philip Rivers  LAC       QB 37.0                     9.000000   7.927174
+      Jason Peters  PHI       LT 36.0                     7.333332   7.201433
+      Jimmy Graham   GB       TE 32.0                     7.333332   6.459177
+
+==================== 2023 SEASON AUDIT ====================
+🏆 Top 10 'High Value' Players (2023) - High Production, Low Cap Hit
+--------------------------------------------------------------------------------
+    player_name team position  cap_hit_millions  fair_market_value  ied_overpayment  value_metric_proxy
+    Brock Purdy   SF       QB          0.889252            198.432      -197.542748          471.407430
+   Joshua Dobbs  ARI       QB          0.666670            120.330      -119.663330          387.373063
+     Sam Howell  WAS       QB          0.960400            169.434      -168.473600          381.768013
+   Joshua Dobbs  MIN       QB          0.833330            120.330      -119.496670          309.901240
+  Jake Browning  CIN       QB          0.750000             91.008       -90.258000          257.066667
+ Baker Mayfield   TB       QB          1.700000            180.126      -178.426000          226.088235
+Aidan O'Connell   LV       QB          0.877345             86.922       -86.044655          215.935578
+ Desmond Ridder  ATL       QB          1.218855            115.614      -114.395145          207.694927
+ Kyren Williams  LAR       RB          0.947601             78.300       -77.352399          166.209196
+     Puka Nacua  LAR       WR          0.811244             49.950       -49.138756          141.449428
+
+☢️ 'The Time Bombs' - Highest EDCE (Dead Cap Risk) (2023)
+--------------------------------------------------------------------------------
+     player_name team position  age  potential_dead_cap_millions  edce_risk
+     Jason Kelce  PHI        C 36.0                       15.184  14.910897
+   Aaron Rodgers  NYJ       QB 40.0                       14.000  13.906300
+Matthew Stafford  LAR       QB 35.0                       24.000  12.000000
+  Trent Williams   SF       LT 35.0                       12.040  11.468992
+  Russell Wilson  DEN       QB 35.0                       20.000  10.000000
+    Aaron Donald  LAR       DL 32.0                       16.000   8.000000
+     Darius Slay  PHI       CB 32.0                        9.024   7.948313
+      Von Miller  BUF       ED 34.0                        7.410   7.276722
+ Cameron Heyward  PIT       DL 34.0                        8.100   7.134456
+  Brandon Graham  PHI       ED 35.0                        6.534   6.490269

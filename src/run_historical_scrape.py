@@ -79,19 +79,26 @@ def scrape_pfr_year(year: int, force: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description="NFL Historical Data Scraper")
-    parser.add_argument("--year", type=int, required=True, help="Season year to scrape")
+    parser.add_argument("--years", type=str, default="2011-2025", help="Range of years (e.g. 2011-2025) or comma-separated list")
     parser.add_argument("--source", choices=['spotrac', 'pfr', 'all'], default='all', help="Data source to scrape")
     parser.add_argument("--force", action='store_true', help="Force re-scrape even if data exists")
     
     args = parser.parse_args()
     
-    logger.info(f"Initializing task: Year={args.year}, Source={args.source}, Force={args.force}")
+    logger.info(f"Initializing task: Years={args.years}, Source={args.source}, Force={args.force}")
     
-    if args.source in ['spotrac', 'all']:
-        scrape_spotrac_year(args.year, force=args.force)
-        
-    if args.source in ['pfr', 'all']:
-        scrape_pfr_year(args.year, force=args.force)
+    if "-" in args.years:
+        start, end = map(int, args.years.split("-"))
+        years = list(range(start, end + 1))
+    else:
+        years = [int(y) for y in args.years.split(",")]
+
+    for year in years:
+        if args.source in ['spotrac', 'all']:
+            scrape_spotrac_year(year, force=args.force)
+            
+        if args.source in ['pfr', 'all']:
+            scrape_pfr_year(year, force=args.force)
         
     logger.info("Task completed successfully.")
 

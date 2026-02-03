@@ -63,7 +63,7 @@ def test_normalize_schema_variations(parser):
 def test_validate_player_data_fails_on_empty(parser):
     """Validator should raise error for empty data"""
     df = pd.DataFrame()
-    with pytest.raises(DataQualityError, match="Expected ≥50 players"):
+    with pytest.raises(DataQualityError, match="Expected ≥30 records"):
         parser.validate_player_data(df, 2024)
 
 def test_validate_player_data_passes_valid(parser):

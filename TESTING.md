@@ -97,17 +97,34 @@ make validate-verbose
 
 ## Test Suite Structure
 
-### Test Files
+## Test Suite Structure (v2.0)
 
-- **`tests/test_dead_money_validator.py`** - DeadMoneyValidator tests
-  - Synthetic player detection
-  - Team vs player reconciliation
-  - Year-over-year consistency
-  - Data file availability
+### Primary Test Files
+
+- **`tests/test_data_integrity.py`** (The "Triple Check")
+  - `test_gold_layer_team_completeness`: Verifies all 32 NFL teams exist in Gold Layer.
+  - `test_gold_layer_no_null_criticals`: Fails if `cap_hit` or `player_name` is NULL.
+  - `test_prediction_coverage_2025`: Ensures 2025 season has valid risk scores.
+
+- **`tests/test_strategic_engine.py`** (Logic Verification)
+  - `test_prescribe_emergency_purge`: Verifies logic for high-risk/low-efficiency teams.
+  - `test_prescribe_successor_suppression`: **[NEW]** Checks that "Draft Priority" is suppressed if a successor (Rd 1-3) exists.
+  - `test_prescribe_fa_suppression`: **[NEW]** Checks that "Draft Priority" is suppressed if a "Big Splash" FA was signed.
+
+- **`tests/test_scraper_logic.py`**
+  - Verifies robustness of Spotrac/PFR parsers (e.g., handling "M/B/K" suffixes).
 
 ### Test Markers
 
 You can run specific test categories:
+
+```bash
+# Run Data Integrity Checks (Pipeline Gates)
+pytest tests/test_data_integrity.py
+
+# Run Strategic Logic Verification
+pytest tests/test_strategic_engine.py
+```
 
 ```bash
 # Run only data quality tests

@@ -1,7 +1,7 @@
 
 from airflow import DAG
-from airflow.operators.bash import BashOperator
-from airflow.utils.dates import days_ago
+from airflow.providers.standard.operators.bash import BashOperator
+import pendulum
 from datetime import timedelta
 
 default_args = {
@@ -17,8 +17,8 @@ with DAG(
     'nfl_fair_value_pipeline',
     default_args=default_args,
     description='Scrape NFL salary and performance data',
-    schedule_interval='@weekly',
-    start_date=days_ago(1),
+    schedule='@weekly',
+    start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
     tags=['nfl', 'scraping'],
 ) as dag:
@@ -62,7 +62,19 @@ with DAG(
         bash_command='python /opt/airflow/dags/repo/src/player_timeline.py'
     )
     
-    # Task 4: Reporting
+    # Task 4: Hyperscale Feature Matrix
+    build_features = BashOperator(
+        task_id='build_feature_matrix',
+        bash_command='python /opt/airflow/dags/repo/src/feature_factory.py'
+    )
+    
+    # Task 5: Production XGBoost Model
+    train_model = BashOperator(
+        task_id='train_production_model',
+        bash_command='python /opt/airflow/dags/repo/src/train_model.py'
+    )
+    
+    # Task 6: Reporting
     run_report = BashOperator(
         task_id='generate_weekly_report',
         bash_command='python /opt/airflow/dags/repo/src/run_historical_analysis.py'
@@ -75,4 +87,4 @@ with DAG(
     for t in scrape_spotrac_tasks:
         t >> run_timeline
         
-    run_timeline >> run_report
+    run_timeline >> build_features >> train_model >> run_report

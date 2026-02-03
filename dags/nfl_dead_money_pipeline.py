@@ -222,7 +222,23 @@ with DAG(
     )
     
     # ========================================================================
-    # LAYER 6: NOTEBOOKS & REPORTING
+    # LAYER 6: HYPERSCALE INTELLIGENCE (NEW)
+    # ========================================================================
+    
+    run_feature_factory = BashOperator(
+        task_id='run_feature_factory',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/feature_factory.py 2>&1 | tail -20',
+        dag=dag,
+    )
+    
+    train_risk_model = BashOperator(
+        task_id='train_risk_model',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} src/train_model.py 2>&1 | tail -20',
+        dag=dag,
+    )
+    
+    # ========================================================================
+    # LAYER 7: NOTEBOOKS & REPORTING
     # ========================================================================
     
     run_salary_analysis_notebook = BashOperator(
@@ -259,10 +275,8 @@ with DAG(
     # Layer 5 (Validation) - depends on dbt marts
     dbt_run_marts >> [data_quality_checks, validate_dead_money]
     
-    # Layer 6 (Reporting) - depends on validation
-    [data_quality_checks, validate_dead_money] >> run_salary_analysis_notebook
-    # Layer 5 (Validation) - parallel after dbt
-    dbt_run_marts >> [data_quality_checks, validate_dead_money]
+    # Layer 6 (Hyperscale Intelligence) - depends on validation
+    [data_quality_checks, validate_dead_money] >> run_feature_factory >> train_risk_model
     
-    # Layer 6 (Notebooks) - final step after all validation
-    [data_quality_checks, validate_dead_money] >> run_salary_analysis_notebook
+    # Layer 7 (Notebooks) - final step
+    train_risk_model >> run_salary_analysis_notebook

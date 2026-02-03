@@ -26,6 +26,30 @@ HEADERS = {
     'Accept-Language': 'en-US,en;q=0.9'
 }
 
+def robust_request(url: str, max_retries: int = 5, initial_backoff: float = 2.0) -> Optional[requests.Response]:
+    """
+    Fetch a URL with exponential backoff for 429 (Rate Limit) errors.
+    """
+    backoff = initial_backoff
+    for i in range(max_retries):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            if resp.status_code == 429:
+                wait_time = backoff * (2**i)
+                logger.warning(f"Rate limited (429) for {url}. Backing off for {wait_time:.1f}s...")
+                time.sleep(wait_time)
+                continue
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.RequestException as e:
+            if i == max_retries - 1:
+                logger.error(f"Failed to fetch {url} after {max_retries} attempts: {e}")
+                return None
+            wait_time = backoff * (2**i)
+            logger.warning(f"Request failed for {url}: {e}. Retrying in {wait_time:.1f}s...")
+            time.sleep(wait_time)
+    return None
+
 def get_boxscore_links(year: int, week: int) -> List[str]:
     """
     Get all boxscore URLs for a specific week.
@@ -40,10 +64,11 @@ def get_boxscore_links(year: int, week: int) -> List[str]:
     url = f"https://www.pro-football-reference.com/years/{year}/week_{week}.htm"
     logger.info(f"Fetching week {week} summary from {url}")
     
+    resp = robust_request(url)
+    if not resp:
+        return []
+    
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        resp.raise_for_status()
-        
         soup = BeautifulSoup(resp.text, 'lxml')
         links = []
         
@@ -60,7 +85,7 @@ def get_boxscore_links(year: int, week: int) -> List[str]:
         return links
         
     except Exception as e:
-        logger.error(f"Error fetching week {week} summary: {e}")
+        logger.error(f"Error parsing week {week} summary: {e}")
         return []
 
 def parse_boxscore(url: str, week: int, year: int) -> pd.DataFrame:
@@ -75,11 +100,13 @@ def parse_boxscore(url: str, week: int, year: int) -> pd.DataFrame:
     Returns:
         DataFrame with combined player stats for the game
     """
+    resp = robust_request(url)
+    if not resp:
+        return pd.DataFrame()
+
     try:
-        # PFR uses comments to hide tables, but pandas read_html might miss them or get them if we are lucky.
+        # PFR uses comments to hide tables
         # robust approach: requests -> text -> remove comments -> read_html
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        resp.raise_for_status()
         
         # Un-comment hidden tables
         html = resp.text.replace('<!--', '').replace('-->', '')
@@ -156,7 +183,7 @@ def scrape_season_logs(year: int, start_week: int = 1, end_week: int = 18):
             df = parse_boxscore(link, week, year)
             if not df.empty:
                 all_logs.append(df)
-            time.sleep(2.0) # Respect rate limits
+            time.sleep(12.0) # Respect rate limits
             
     if all_logs:
         final_df = pd.concat(all_logs, ignore_index=True)
@@ -203,5 +230,6 @@ def scrape_history(start_year: int, end_year: int):
 
 if __name__ == "__main__":
     # Historical scrape working backwards
-    # Range: 2024 -> 2015
-    scrape_history(2024, 2015)
+    # Range: 2025 -> 2015
+    scrape_history(2025, 2015)
+

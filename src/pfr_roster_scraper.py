@@ -132,7 +132,11 @@ class PFRRosterScraper:
                 continue
             
             try:
-                player_name = cells[0].get_text().strip()
+                player_cell = cells[0]
+                player_name = player_cell.get_text().strip()
+                player_link = player_cell.find('a', href=True)
+                player_url = player_link['href'] if player_link else None
+                
                 position = cells[1].get_text().strip()
                 
                 # Skip if empty
@@ -155,6 +159,7 @@ class PFRRosterScraper:
                 
                 players.append({
                     'player_name': player_name,
+                    'player_url': player_url,
                     'position': position,
                     'team': team_code,
                     'year': year,

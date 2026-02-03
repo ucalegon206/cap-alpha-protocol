@@ -6,6 +6,14 @@ airflow/
 notebooks/outputs/
 dag_visualization/
 
+# Machine Learning Models
+*.pkl
+*.h5
+*.pt
+*.joblib
+*.model
+models/
+
 # OS/editor noise
 .DS_Store
 .vscode/
@@ -52,3 +60,8 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+data/nfl_data.db
+__pycache__/
+.venv/
+.DS_Store
+data/
