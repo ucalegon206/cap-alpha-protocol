@@ -95,7 +95,23 @@ make validate
 make validate-verbose
 ```
 
-## Test Suite Structure
+## End-to-End Pipeline Testing
+
+### Full Production Simulation
+To verify the entire pipeline flow (Scraping -> Ingestion -> ML -> Reporting) exactly as it runs in the Airflow DAG:
+
+```bash
+./tests/e2e_production_run.sh
+```
+
+**What this does:**
+1.  **Scraping**: Runs `src/run_historical_scrape.py` (Live web scraping)
+2.  **Ingestion**: Runs `scripts/ingest_to_duckdb.py` (Builds Gold Layer)
+3.  **Feature Store**: Runs `src/feature_factory.py` (Hyperscale Matrix)
+4.  **Training**: Runs `src/train_model.py` (XGBoost)
+5.  **Reporting**: Runs `scripts/financial_lift_report.py` (ROI Analysis)
+
+**Note**: This test interacts with the live internet and local file system. It may take several minutes.
 
 ## Test Suite Structure (v2.0)
 

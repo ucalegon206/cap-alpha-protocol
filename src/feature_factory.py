@@ -58,6 +58,13 @@ class FeatureFactory:
             'leadership_friction': 25   # Team cohesion
         }
         
+        # Reproducibility (MLE Skill)
+        np.random.seed(42)
+        
+        # Safety fallback for missing sentiment data
+        if 'sentiment_volume' not in df.columns:
+            df['sentiment_volume'] = 1.0
+            
         for category, count in narrative_categories.items():
             for i in range(count):
                 # Placeholder for NLP-derived sentiment scores

@@ -82,12 +82,35 @@ class RiskModeler:
         return shap_values
 
     def save_predictions(self, model, X, metadata):
-        logger.info("Saving Predictions to DuckDB...")
+        import joblib
+        import json
+        from datetime import datetime
+        
+        logger.info("Saving Predictions and Model Artifacts...")
+        
+        # 1. Save Predictions to DB
         preds = model.predict(X)
         metadata['predicted_risk_score'] = preds
-        
         self.con.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata")
         logger.info("✓ Predictions persisted to 'prediction_results' table.")
+        
+        # 2. Save Model Artifact (MLE Skill)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_path = MODEL_DIR / f"xgboost_risk_model_{timestamp}.pkl"
+        joblib.dump(model, model_path)
+        logger.info(f"✓ Model artifact saved to: {model_path}")
+        
+        # 3. Save Model Metadata (MLE Skill)
+        meta = {
+            "training_timestamp": timestamp,
+            "feature_count": X.shape[1],
+            "feature_names": list(X.columns),
+            "model_params": model.get_params(),
+            "metrics": "See logs (RMSE/R2)" # In a real system, pass these in
+        }
+        with open(MODEL_DIR / f"model_meta_{timestamp}.json", "w") as f:
+            json.dump(meta, f, indent=2)
+        logger.info("✓ Model metadata saved.")
 
 if __name__ == "__main__":
     modeler = RiskModeler()

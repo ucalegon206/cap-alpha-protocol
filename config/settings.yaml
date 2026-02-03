@@ -1,6 +1,7 @@
 project:
   name: "nfl-dead-money"
   version: "2.0.0"
+  current_season: 2025
 
 paths:
   data_raw: "data_raw"

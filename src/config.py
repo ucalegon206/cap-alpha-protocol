@@ -23,6 +23,9 @@ MODELS_DIR = BASE_DIR / _config["paths"]["models"]
 REPORTS_DIR = BASE_DIR / _config["paths"]["reports"]
 VIZ_DIR = BASE_DIR / _config["paths"]["viz"]
 
+# Global Constants
+CURRENT_SEASON = _config["project"]["current_season"]
+
 # Create dirs if they don't exist (Safety)
 for d in [DATA_RAW_DIR, DATA_PROCESSED_DIR, MODELS_DIR, REPORTS_DIR, VIZ_DIR]:
     d.mkdir(parents=True, exist_ok=True)
