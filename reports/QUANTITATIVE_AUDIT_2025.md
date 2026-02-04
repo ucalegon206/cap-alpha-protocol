@@ -3,9 +3,9 @@
 ### **The Pricing of Volatility in a Sophisticated Market**
 NFL front offices are no longer guessing. In 2026, teams operate with incredible sophistication—utilizing EPA models, Next Gen Stats tracking, and complex cash-flow analyses to value their rosters. The days of "cap hit vs. box score" are long gone.
 
-However, even in hyper-optimized markets, **inefficiency** hides in the margins. Specifically, the market often struggles to price **Disciplinary Volatility**—the compounding cost of technical error rates (penalties) acting as a drag on otherwise efficient contracts.
+However, even in hyper-optimized markets, pricing **Second-Order Volatility** remains a challenge. While every team knows penalties are bad, quantifying their **compounding strategic drag**—the disruption of offensive rhythm, the forcing of conservative play-calling, and the specific field-position leverage lost—is notoriously difficult to isolate in traditional efficiency models.
 
-I spent the last month building a **Strategic Intelligence Engine** to conduct an independent quantitative audit of this specific risk vector. By integrating live 2025 data, we isolated the delta between a player’s "Paper Efficiency" (Contract vs. Production) and their "Realized Liquidity" when adjusted for disciplinary liability.
+I spent the last month building a **Strategic Intelligence Engine** to conduct an independent quantitative audit of these second-order costs. By integrating live 2025 data, we isolated the delta between a player’s "Paper Efficiency" (Contract vs. Production) and their "Realized Liquidity" when adjusted for this specific disciplinary tax.
 
 ---
 
