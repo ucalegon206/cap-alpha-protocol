@@ -1,10 +1,10 @@
-# 🏈 NFL Dead Money: Technical Architecture Guide
-
-**System Version**: 2.0 (Production Hardened)  
+# 🏈 Cap Alpha Protocol: Strategic Intelligence Engine
+ 
+**System Version**: 2.1 (Production Hardened)  
 **Last Updated**: Feb 2026
 
 ## 1. System Overview
-The **NFL Dead Money Pipeline** is a hyperscale intelligence system designed to quantify "Cap Toxicity" (fiscal risk) and prescribe strategic actions for NFL front offices. It ingests financial data (Spotrac) and performance metrics (PFR), models the probability of "Dead Money" utilizing XGBoost, and generates automated strategic audits.
+The **Cap Alpha Protocol** is a hyperscale intelligence system designed to quantify "Liquidity Drag" (formerly Dead Money) and prescribe strategic actions for NFL front offices. It ingests financial data (Spotrac) and performance metrics (PFR), models the probability of "Capital Inefficiency" utilizing XGBoost, and generates automated strategic audits.
 
 ### Key Capabilities
 - **Risk Frontier Modeling**: Predicts the 24-month probability of a contract becoming "Toxic" (Dead Money > Performance Value).

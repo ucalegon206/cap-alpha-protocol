@@ -272,7 +272,7 @@ def generate_league_snapshot(data_dead, data_win, target_year, title, filename_s
     svg.append(f'<text x="{width/2}" y="40" font-family="Arial" font-size="32" text-anchor="middle" font-weight="bold">{title}</text>')
     svg.append(f'<text x="{width/2}" y="70" font-family="Arial" font-size="20" text-anchor="middle" fill="#555">{target_year} Season</text>')
     
-    svg.append(f'<text x="{width/2}" y="{height-20}" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Dead Money % (Wasted Cap)</text>')
+    svg.append(f'<text x="{width/2}" y="{height-20}" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Liquidity Drag % (Inefficient Capital)</text>')
     svg.append(f'<text x="20" y="{height/2}" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold" transform="rotate(-90 20 {height/2})">Winning Percentage</text>')
 
     svg.append(f'<line x1="{padding}" y1="{height-padding}" x2="{width-padding}" y2="{height-padding}" stroke="#333" stroke-width="3" />')
@@ -425,7 +425,7 @@ def generate_efficiency_frontier(data_dead, data_win, years, title, filename_suf
     svg.append(f'<text x="{width-padding-40}" y="{height-padding-80}" font-family="Arial" font-size="24" font-weight="bold" fill="#C5221F" opacity="0.8" text-anchor="end">CAP HELL</text>')
 
     svg.append(f'<text x="{width/2}" y="40" font-family="Arial" font-size="32" text-anchor="middle" font-weight="bold">{title}</text>')
-    svg.append(f'<text x="{width/2}" y="{height-20}" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Dead Money % (Wasted Cap)</text>')
+    svg.append(f'<text x="{width/2}" y="{height-20}" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Liquidity Drag % (Inefficient Capital)</text>')
     
     # Axes
     svg.append(f'<line x1="{padding}" y1="{height-padding}" x2="{width-padding}" y2="{height-padding}" stroke="#333" stroke-width="3" />')

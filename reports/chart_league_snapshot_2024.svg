@@ -5,7 +5,7 @@
 <text x="880" y="840" font-family="Arial" font-size="24" font-weight="bold" fill="#C5221F" opacity="0.8" text-anchor="end">CAP HELL</text>
 <text x="500.0" y="40" font-family="Arial" font-size="32" text-anchor="middle" font-weight="bold">The 2024 League Landscape: Playoff Efficiency</text>
 <text x="500.0" y="70" font-family="Arial" font-size="20" text-anchor="middle" fill="#555">2024 Season</text>
-<text x="500.0" y="980" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Dead Money % (Wasted Cap)</text>
+<text x="500.0" y="980" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Liquidity Drag % (Inefficient Capital)</text>
 <text x="20" y="500.0" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold" transform="rotate(-90 20 500.0)">Winning Percentage</text>
 <line x1="80" y1="920" x2="920" y2="920" stroke="#333" stroke-width="3" />
 <line x1="80" y1="80" x2="80" y2="920" stroke="#333" stroke-width="3" />

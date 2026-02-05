@@ -7,7 +7,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 REPORT_PATH = Path("reports/super_bowl_lx_risk_audit.md")
 
 def generate_sb_audit():

@@ -7,7 +7,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 
 def test_gold_layer_build_integrity():
     """

@@ -190,6 +190,17 @@ def ensure_dir(d):
         pass
 
 if __name__ == "__main__":
-    for y in range(2011, 2016): # 2011-2015 fix
+    import argparse
+    parser = argparse.ArgumentParser(description="Scrape NFL Dead Money Data (Production Backfill)")
+    parser.add_argument("--start", type=int, default=2011, help="Start Year (inclusive)")
+    parser.add_argument("--end", type=int, default=2025, help="End Year (inclusive)")
+    parser.add_argument("--delay", type=float, default=2.0, help="Delay between requests (seconds)")
+    args = parser.parse_args()
+
+    print(f"--- CAP ALPHA PROTOCOL: BACKFILL INITIATED ({args.start}-{args.end}) ---")
+    
+    for y in range(args.start, args.end + 1):
         scrape_year(y)
-        time.sleep(1)
+        time.sleep(args.delay)
+    
+    print("--- BACKFILL COMPLETE ---")

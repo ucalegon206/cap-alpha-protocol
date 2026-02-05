@@ -10,7 +10,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 
 class WebIntelligenceHoover:
     def __init__(self, search_tool):

@@ -6,7 +6,7 @@ from src.strategic_engine import StrategicEngine
 
 @pytest.fixture
 def engine():
-    return StrategicEngine("data/nfl_data.db")
+    return StrategicEngine("data/nfl_belichick.db")
 
 def test_prescribe_emergency_purge(engine):
     row = pd.Series({

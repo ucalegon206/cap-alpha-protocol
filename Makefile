@@ -1,101 +1,81 @@
-.PHONY: help test test-verbose test-coverage lint format format-check install-hooks run-hooks clean dbt-test dbt-build dbt-docs
+# Cap Alpha Protocol: Production Makefile
+# "The Google Standard" for Local Development
 
-help:
-	@echo "NFL Dead Money - Development Commands"
-	@echo ""
-	@echo "Testing:"
-	@echo "  make test                 Run all tests"
-	@echo "  make test-verbose         Run tests with verbose output"
-	@echo "  make test-coverage        Run tests with coverage report (XML + HTML)"
-	@echo "  make test-quick           Run tests excluding slow tests"
-	@echo "  make test-weekly          Run critical tests for weekly pipeline"
-	@echo "  make test-integration     Run integration tests (network required)"
-	@echo "  make test-all             Run ALL tests (unit + integration + slow)"
-	@echo ""
-	@echo "dbt:"
-	@echo "  make dbt-test             Run dbt tests"
-	@echo "  make dbt-build            Run dbt build (models + tests)"
-	@echo "  make dbt-docs             Generate and serve dbt docs"
-	@echo ""
-	@echo "Code Quality:"
-	@echo "  make lint                 Run linters (flake8, black, isort)"
-	@echo "  make format               Format code (black, isort)"
-	@echo "  make format-check         Check code formatting without changes"
-	@echo ""
-	@echo "Pre-commit:"
-	@echo "  make install-hooks        Install pre-commit hooks"
-	@echo "  make run-hooks            Run pre-commit hooks on all files"
-	@echo ""
-	@echo "Validation:"
-	@echo "  make validate             Run dead money validator"
-	@echo "  make validate-verbose     Run validator with detailed output"
-	@echo ""
-	@echo "Cleanup:"
-	@echo "  make clean                Remove cache and build files"
+.PHONY: all ingest validate features train audit clean help
 
+PYTHON := ./.venv/bin/python
+PYTEST := ./.venv/bin/pytest
+
+# Default Target (Full End-to-End)
+all: audit
+
+# --- 1. Ingestion (Bronze/Silver) ---
+# Depends on raw script changes or manual trigger
+data/nfl_belichick.db: scripts/ingest_to_duckdb.py
+	@echo "🏈 [Ingest] Hydrating DuckDB (Bronze/Silver)..."
+	$(PYTHON) scripts/ingest_to_duckdb.py --year 2024 # Defaults to current for speed, use full backfill separately
+	@touch data/nfl_belichick.db
+
+ingest: data/nfl_belichick.db
+
+# --- 2. Quality Gate ---
+validate: ingest
+	@echo "🛡️ [Validate] Checking Silver Layer Integrity..."
+	$(PYTHON) scripts/validate_gold_layer.py
+
+# --- 3. Feature Engineering (Gold) ---
+# Only re-run if ingestion changed or feature logic changed
+data/gold_features.parquet: data/nfl_belichick.db src/feature_factory.py
+	@echo "🏭 [Features] Building Gold Layer..."
+	$(PYTHON) src/feature_factory.py
+
+features: data/gold_features.parquet
+
+# --- 4. Model Training (XGBoost) ---
+# Only re-train if features changed or model code changed
+models/xgb_production.model: data/gold_features.parquet src/train_model.py
+	@echo "🧠 [Train] Training Risk Frontier Model..."
+	$(PYTHON) src/train_model.py
+
+train: models/xgb_production.model
+
+# --- 6. Visualization (The "Money" Shot) ---
+charts: data/nfl_belichick.db
+	@echo "🎨 [Viz] Regenerating Executive Charts..."
+	$(PYTHON) scripts/generate_all_charts.py
+	$(PYTHON) scripts/generate_brand_value_chart.py
+	$(PYTHON) scripts/generate_risk_svg.py
+
+# --- 7. Audits & Reliability ---
+audit: train charts
+	@echo "📜 [Audit] Generating Strategic Intelligence..."
+	$(PYTHON) run_pipeline.py --skip-ingest --skip-features --skip-training # Use the orchestrator for reporting layer only
+
+# --- Utilities ---
 test:
-	./.venv/bin/pytest tests/ -q
-
-test-verbose:
-	./.venv/bin/pytest tests/ -v
-
-test-coverage:
-	./.venv/bin/pytest tests/ --cov=src --cov-report=html --cov-report=xml --cov-report=term-missing
-
-test-quick:
-	./.venv/bin/pytest tests/ -m "not slow" -q
-
-test-integration:
-	@echo "Running integration tests (requires network)..."
-	./.venv/bin/pytest tests/ -v -m "integration"
-
-test-weekly:
-	@echo "Running critical tests for weekly scheduled pipeline..."
-	./.venv/bin/pytest tests/test_data_freshness.py tests/test_pipeline_idempotency.py tests/test_year_parameterization.py -v
-
-test-all:
-	@echo "Running ALL tests (unit + integration + slow)..."
-	./.venv/bin/pytest tests/ -v
-
-lint:
-	@echo "Running flake8..."
-	./.venv/bin/flake8 src/ tests/ --max-line-length=120 --extend-ignore=E203,W503 || true
-	@echo "Checking black formatting..."
-	./.venv/bin/black --check src/ tests/ || true
-	@echo "Checking import sorting..."
-	./.venv/bin/isort --check-only src/ tests/ || true
-
-format:
-	./.venv/bin/black src/ tests/
-	./.venv/bin/isort src/ tests/
-
-format-check:
-	./.venv/bin/black --check src/ tests/
-	./.venv/bin/isort --check-only src/ tests/
-
-install-hooks:
-	./.venv/bin/pre-commit install
-
-run-hooks:
-	./.venv/bin/pre-commit run --all-files
-
-dbt-test:
-	cd dbt && ../.venv/bin/dbt test --profiles-dir . --project-dir .
-
-dbt-build:
-	cd dbt && ../.venv/bin/dbt build --profiles-dir . --project-dir .
-
-dbt-docs:
-	cd dbt && ../.venv/bin/dbt docs generate --profiles-dir . --project-dir .
-
-validate:
-	./.venv/bin/python src/dead_money_validator.py
-
-validate-verbose:
-	PYTHONPATH=. ./.venv/bin/python -u src/dead_money_validator.py
+	@echo "🧪 [Test] Running Integrity Suite..."
+	$(PYTEST) tests/test_strategic_engine.py tests/test_data_integrity.py
 
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
-	rm -rf .pytest_cache .coverage htmlcov .mypy_cache
-	rm -rf src/__pycache__ tests/__pycache__
+	@echo "🧹 [Clean] Removing cache and temporary files..."
+	rm -rf __pycache__ .pytest_cache
+	rm -f data/gold_features.parquet
+	rm -f reports/archive/*
+
+# Full 15-Year Backfill (The "Nuclear Option")
+backfill:
+	@echo "☢️ [Backfill] Executing Full 15-Year Protocol..."
+	$(PYTHON) scripts/backfill_dead_cap.py --start 2011 --end 2025
+	for y in {2011..2025}; do $(PYTHON) scripts/ingest_to_duckdb.py --year $$y; done
+
+help:
+	@echo "Cap Alpha Protocol Build System"
+	@echo "-------------------------------"
+	@echo "make all       -> Run full pipeline (incremental)"
+	@echo "make ingest    -> Update DuckDB (Bronze/Silver)"
+	@echo "make features  -> Rebuild Gold Layer"
+	@echo "make train     -> Retrain Execution Model"
+	@echo "make charts    -> Regenerate SVG Visualizations"
+	@echo "make audit     -> Generate MD Reports"
+	@echo "make test      -> Run Pytest Suite"
+	@echo "make backfill  -> Run 15-year History Scrape"

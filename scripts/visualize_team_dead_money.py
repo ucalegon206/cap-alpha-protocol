@@ -79,7 +79,7 @@ def create_stacked_bar_chart(df, output_path='notebooks/outputs/dead_money_stack
     
     fig.update_layout(
         title={
-            'text': 'NFL Dead Money by Team (2015-2024)<br><sub>Stacked by Team</sub>',
+            'text': 'NFL Liquidity Drag by Team (2015-2024)<br><sub>Stacked by Team</sub>',
             'x': 0.5,
             'xanchor': 'center'
         },
@@ -174,7 +174,7 @@ def create_grouped_bar_chart(df, output_path='notebooks/outputs/dead_money_yearl
         width=1000,
         hovermode='x unified',
         yaxis=dict(
-            title='Total League Dead Money (Millions USD)',
+            title='Total League Liquidity Drag (Millions USD)',
             tickprefix='$',
             ticksuffix='M',
             side='left'

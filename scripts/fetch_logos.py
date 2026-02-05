@@ -49,6 +49,11 @@ def run():
     ctx.verify_mode = ssl.CERT_NONE
 
     for team, url in logos.items():
+        fname = f"{out_dir}/{team}.png"
+        if os.path.exists(fname):
+            print(f"Skipping {team} (already exists)")
+            continue
+            
         print(f"Fetching {team} logo...")
         try:
             # Fake a user agent to avoid Wikipedia blocking

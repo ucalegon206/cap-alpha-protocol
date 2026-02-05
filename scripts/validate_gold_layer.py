@@ -7,7 +7,7 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 
 def validate_gold_layer():
     logger.info("--- Starting Gold Layer Validation ---")

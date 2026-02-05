@@ -8,11 +8,11 @@ def generate_svg():
     data = {}
     years = sorted(range(2015, 2025))
     teams_to_plot = {
-        'DEN': {'color': '#FF5500', 'name': 'Denver'},
-        'SEA': {'color': '#00FF00', 'name': 'Seattle'},
-        'NE':  {'color': '#0000FF', 'name': 'New England'},
-        'PHI': {'color': '#00AAAA', 'name': 'Philadelphia'},
-        'KC':  {'color': '#FFD700', 'name': 'Kansas City'}
+        'DEN': {'color': '#FB4F14', 'name': 'Denver'}, # Broncos Orange
+        'SEA': {'color': '#005C5C', 'name': 'Seattle'}, # Seahawks Blue (Better contrast than Action Green #69BE28 on white)
+        'NE':  {'color': '#002244', 'name': 'New England'}, # Patriots Nautical Blue
+        'PHI': {'color': '#004C54', 'name': 'Philadelphia'}, # Eagles Midnight Green
+        'KC':  {'color': '#E31837', 'name': 'Kansas City'} # Chiefs Red
     }
 
     # Iterate headers
@@ -42,8 +42,10 @@ def generate_svg():
     svg = []
     svg.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" style="background-color:white;">')
     
-    # Title
-    svg.append(f'<text x="{width/2}" y="30" font-family="Arial" font-size="24" text-anchor="middle" font-weight="bold">The Toxic Debt Trap: Dead Cap % (2015-2024)</text>')
+    # Title & Metadata
+    font_stack = "Inter, Roboto, Helvetica, Arial, sans-serif"
+    svg.append(f'<text x="{width/2}" y="30" font-family="{font_stack}" font-size="24" text-anchor="middle" font-weight="bold" fill="#333">The Liquidity Drag: Dead Cap % ({years[0]}-{years[-1]})</text>')
+    svg.append(f'<text x="{width/2}" y="50" font-family="{font_stack}" font-size="14" text-anchor="middle" fill="#666">Source: Cap Alpha Protocol (2025 Audit)</text>')
     
     # Axes
     # Y Axis lines
@@ -57,10 +59,11 @@ def generate_svg():
         x_pos = padding + (i * x_step)
         svg.append(f'<text x="{x_pos}" y="{height-padding+20}" font-family="Arial" font-size="12" text-anchor="middle">{year}</text>')
         
-    # Efficient Zone
+    # Efficient Zone (Softened for Cognitive Load)
     safe_h = (12 / y_max) * chart_h
-    svg.append(f'<rect x="{padding}" y="{height-padding-safe_h}" width="{chart_w}" height="{safe_h}" fill="green" fill-opacity="0.05" />')
-    svg.append(f'<text x="{width-padding-10}" y="{height-padding-safe_h+20}" font-family="Arial" font-size="12" fill="green" text-anchor="end">Efficient Zone (Under 12%)</text>')
+    svg.append(f'<rect x="{padding}" y="{height-padding-safe_h}" width="{chart_w}" height="{safe_h}" fill="#d1fae5" fill-opacity="0.6" />') # Soft Mint
+    svg.append(f'<line x1="{padding}" y1="{height-padding-safe_h}" x2="{width-padding}" y2="{height-padding-safe_h}" stroke="#059669" stroke-width="1" stroke-dasharray="4" />')
+    svg.append(f'<text x="{width-padding-10}" y="{height-padding-safe_h-10}" font-family="{font_stack}" font-size="12" fill="#065f46" font-weight="bold" text-anchor="end">Efficient Zone (Under 12%)</text>')
 
     # 3. Plot Lines
     # Plot background teams first (gray)

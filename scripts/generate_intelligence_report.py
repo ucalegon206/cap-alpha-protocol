@@ -7,7 +7,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 REPORT_PATH = Path("reports/production_risk_intelligence_2025.md")
 
 def generate_world_class_report():
@@ -89,7 +89,7 @@ def generate_world_class_report():
         f.write("- **Auto-Pruning**: Used L1 Regularization to strip noise, leaving only the 127 most predictive signals.\n\n")
         
         f.write("---\n")
-        f.write("*CONFIDENTIAL: NFL Dead Money Analytics - Super Bowl LX Edition*")
+        f.write("*CONFIDENTIAL: Cap Alpha Protocol - Super Bowl LX Edition*")
 
     logger.info(f"✓ World-Class Intelligence Report generated at {REPORT_PATH}")
 

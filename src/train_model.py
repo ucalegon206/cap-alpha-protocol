@@ -13,7 +13,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True)
 

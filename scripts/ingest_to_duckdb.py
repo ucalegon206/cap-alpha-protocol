@@ -15,7 +15,7 @@ from src.financial_ingestion import load_team_financials, load_player_merch
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 RAW_DIR = Path("data/raw")
 
 def clean_doubled_name(name):

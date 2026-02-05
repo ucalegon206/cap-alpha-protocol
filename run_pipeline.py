@@ -20,41 +20,68 @@ def run_step(name, command):
         sys.exit(e.returncode)
 
 def main():
-    logger.info("NFL Dead Money Pipeline: Hardened End-to-End Execution")
+    import argparse
+    parser = argparse.ArgumentParser(description="NFL Dead Money Pipeline Orchestrator")
+    parser.add_argument("--skip-ingest", action="store_true", help="Skip Bronze Layer Ingestion (2011-2025)")
+    parser.add_argument("--skip-validation", action="store_true", help="Skip Gold Layer Validation")
+    parser.add_argument("--skip-features", action="store_true", help="Skip Feature Engineering")
+    parser.add_argument("--skip-training", action="store_true", help="Skip Model Training")
+    parser.add_argument("--skip-tests", action="store_true", help="Skip Integrity Tests")
+    parser.add_argument("--skip-audits", action="store_true", help="Skip Strategic Audits & Reports")
+    args = parser.parse_args()
+
+    logger.info(f"--- Pipeline Started with Options: {args} ---")
     
-    # 1. Ingestion & Normalization
-    run_step("Data Ingestion", "scripts/ingest_to_duckdb.py")
+    # 1. Ingestion & Normalization (Bronze/Silver)
+    if not args.skip_ingest:
+        for year in range(2011, 2026):
+             run_step(f"Ingestion {year}", f"scripts/ingest_to_duckdb.py --year {year}")
+    else:
+        logger.info("⏭️  Skipping Ingestion (Bronze Layer)")
     
-    # 2. Quality Gate (Pre-Modeling)
-    run_step("Data Validation", "scripts/validate_gold_layer.py")
+    # 2. Quality Gate (Silver/Gold Check)
+    if not args.skip_validation:
+        run_step("Data Validation", "scripts/validate_gold_layer.py")
+    else:
+        logger.info("⏭️  Skipping Validation (Quality Gate)")
     
-    # 3. Feature Engineering
-    run_step("Feature Factory", "src/feature_factory.py")
+    # 3. Feature Engineering (Gold Layer Construction)
+    if not args.skip_features:
+        run_step("Feature Factory", "src/feature_factory.py")
+    else:
+        logger.info("⏭️  Skipping Feature Engineering (Gold Layer)")
     
     # 4. Model Training & Risk Frontier (Production XGBoost)
-    run_step("Production Training", "src/train_model.py")
+    if not args.skip_training:
+        run_step("Production Training", "src/train_model.py")
+    else:
+        logger.info("⏭️  Skipping Training (Model Layer)")
     
     # 5. Pipeline Integrity Testing (Formal pytest)
-    # We skip Selenium-based tests for speed during standard pipeline runs
-    run_step("Integrity Testing", "-m pytest tests/test_strategic_engine.py tests/test_data_integrity.py")
+    if not args.skip_tests:
+        run_step("Integrity Testing", "-m pytest tests/test_strategic_engine.py tests/test_data_integrity.py")
+    else:
+        logger.info("⏭️  Skipping Tests (Integrity Layer)")
     
     # 6. Strategic Intelligence & Audits
-    logger.info("--- Starting Step: Strategic Audits ---")
-    try:
-        engine = StrategicEngine("data/nfl_data.db")
-        engine.generate_audit_report("reports/nfl_team_strategic_audit_2025.md", year=2025)
-        # Explicitly close to release DuckDB lock
-        engine.close()
-        logger.info("--- Completed Step: Strategic Audits ---")
-    except Exception as e:
-        logger.error(f"--- FAILED Step: Strategic Audits ({e}) ---")
-        sys.exit(1)
+    if not args.skip_audits:
+        logger.info("--- Starting Step: Strategic Audits ---")
+        try:
+            engine = StrategicEngine("data/nfl_belichick.db")
+            engine.generate_audit_report("reports/nfl_team_strategic_audit_2025.md", year=2025)
+            engine.close()
+            logger.info("--- Completed Step: Strategic Audits ---")
+        except Exception as e:
+            logger.error(f"--- FAILED Step: Strategic Audits ({e}) ---")
+            sys.exit(1)
 
-    # 7. Supplemental Reports
-    run_step("Super Bowl Audit", "scripts/generate_sb_audit.py")
-    run_step("Intelligence Report", "scripts/generate_intelligence_report.py")
+        # 7. Supplemental Reports
+        run_step("Super Bowl Audit", "scripts/generate_sb_audit.py")
+        run_step("Intelligence Report", "scripts/generate_intelligence_report.py")
+    else:
+         logger.info("⏭️  Skipping Audits (Reporting Layer)")
     
-    logger.info("✓ Pipeline Execution Successful. Production Artifacts Updated.")
+    logger.info("✓ Pipeline Execution Successful. Artifacts Updated.")
 
 if __name__ == "__main__":
     main()

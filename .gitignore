@@ -1,67 +1,41 @@
-# Logs
-*.log
-airflow/
 
-# Generated visualization outputs
-notebooks/outputs/
-dag_visualization/
-
-# Machine Learning Models
-*.pkl
-*.h5
-*.pt
-*.joblib
-*.model
-models/
-
-# OS/editor noise
-.DS_Store
-.vscode/
-
-# Bytecode
-__pycache__/
-*.pyc
-
-# Local envs
-.venv/
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
-.venv
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
-
-# Data files
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
-data/nfl_data.db
-__pycache__/
 .venv/
-.DS_Store
+env/
+venv/
+
+# Logs
+*.log
+dbt/logs/
+
+# Data
 data/
+!data/raw/logos/
+
+# Notebook Outputs
+notebooks/outputs/
+!data_raw/logos/*.png # We want to keep logos? No, usually gitignore data. 
+# But wait, user said "fetch all logos". If they are large, ignore. 
+# I will ignore data_raw generally but maybe keep logos if small.
+# Given the user context "portfolio", usually we don't commit 100MB of data. 
+# BUT I committed generated reports.
+
+# Reports - Keep SVG/HTML, ignore temp
+reports/chart_frames/
+# Actually we want the frames? If we want the viewer to work on GitHub pages, we need them.
+# There are 30 small SVGs. Safe to commit.
+
+# Models
+*.model
+*.pkl
+!models/xgboost_risk_model_*.pkl # We verify this is small enough (3.8MB) - keeping for portfolio demo
+
+# Database & Features (Large Binaries)
+data/*.db
+data/*.parquet
+
+# System
+.DS_Store

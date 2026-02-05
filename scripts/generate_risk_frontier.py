@@ -8,7 +8,7 @@ from pathlib import Path
 # Use a sleek dark theme
 plt.style.use('dark_background')
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = "data/nfl_belichick.db"
 OUTPUT_PATH = "reports/real_discipline_frontier.png"
 
 def generate_frontier_plot():
