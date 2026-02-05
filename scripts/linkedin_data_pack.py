@@ -16,19 +16,6 @@ team_stats = con.execute("""
     ORDER BY avg_overpayment_per_player DESC
 """).df()
 
-# 2. The Super Bowl Contender Analysis (KC example)
-kc_v_others = con.execute("""
-    SELECT 
-        player_name, 
-        cap_hit_millions, 
-        potential_dead_cap_millions as dead_money_exposure,
-        ROUND(edce_risk, 2) as risk_factor
-    FROM fact_player_efficiency 
-    WHERE team = 'KC' AND year = 2025
-    ORDER BY risk_factor DESC 
-    LIMIT 5
-""").df()
-
 # 3. Merch ROI (Who sells the most jerseys for the least salary)
 merch_roi = con.execute("""
     SELECT 
@@ -45,8 +32,6 @@ merch_roi = con.execute("""
 
 print("TEAM VULNERABILITY RANKINGS:")
 print(team_stats.head(10))
-print("\nCHIEFS TOP FINANCIAL RISK VECTORS (The 'Super Bowl Tax'):")
-print(kc_v_others)
 print("\nNFL MERCHANDISE ROI KINGS (Highest Rank per Dollar):")
 print(merch_roi)
 

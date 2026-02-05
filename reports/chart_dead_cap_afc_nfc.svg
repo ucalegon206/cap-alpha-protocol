@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" style="background-color:white;">
+<text x="500.0" y="30" font-family="Arial" font-size="24" text-anchor="middle" font-weight="bold">Conference Risk: Avg Dead Cap % (AFC vs NFC)</text>
+<text x="820" y="52" font-family="Arial" font-size="12" fill="#D50A0A" font-weight="bold">AFC (Red)</text>
+<text x="900" y="52" font-family="Arial" font-size="12" fill="#013369" font-weight="bold">NFC (Blue)</text>
+<line x1="60" y1="540.0" x2="940" y2="540.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="545.0" font-family="Arial" font-size="12" text-anchor="end">0%</text>
+<line x1="60" y1="444.0" x2="940" y2="444.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="449.0" font-family="Arial" font-size="12" text-anchor="end">4%</text>
+<line x1="60" y1="348.0" x2="940" y2="348.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="353.0" font-family="Arial" font-size="12" text-anchor="end">9%</text>
+<line x1="60" y1="252.0" x2="940" y2="252.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="257.0" font-family="Arial" font-size="12" text-anchor="end">14%</text>
+<line x1="60" y1="156.0" x2="940" y2="156.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="161.0" font-family="Arial" font-size="12" text-anchor="end">19%</text>
+<line x1="60" y1="60.0" x2="940" y2="60.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="65.0" font-family="Arial" font-size="12" text-anchor="end">24%</text>
+<text x="60.0" y="560" font-family="Arial" font-size="12" text-anchor="middle">2011</text>
+<text x="122.85714285714286" y="560" font-family="Arial" font-size="12" text-anchor="middle">2012</text>
+<text x="185.71428571428572" y="560" font-family="Arial" font-size="12" text-anchor="middle">2013</text>
+<text x="248.57142857142856" y="560" font-family="Arial" font-size="12" text-anchor="middle">2014</text>
+<text x="311.42857142857144" y="560" font-family="Arial" font-size="12" text-anchor="middle">2015</text>
+<text x="374.2857142857143" y="560" font-family="Arial" font-size="12" text-anchor="middle">2016</text>
+<text x="437.1428571428571" y="560" font-family="Arial" font-size="12" text-anchor="middle">2017</text>
+<text x="500.0" y="560" font-family="Arial" font-size="12" text-anchor="middle">2018</text>
+<text x="562.8571428571429" y="560" font-family="Arial" font-size="12" text-anchor="middle">2019</text>
+<text x="625.7142857142857" y="560" font-family="Arial" font-size="12" text-anchor="middle">2020</text>
+<text x="688.5714285714286" y="560" font-family="Arial" font-size="12" text-anchor="middle">2021</text>
+<text x="751.4285714285714" y="560" font-family="Arial" font-size="12" text-anchor="middle">2022</text>
+<text x="814.2857142857142" y="560" font-family="Arial" font-size="12" text-anchor="middle">2023</text>
+<text x="877.1428571428571" y="560" font-family="Arial" font-size="12" text-anchor="middle">2024</text>
+<text x="940.0" y="560" font-family="Arial" font-size="12" text-anchor="middle">2025</text>
+<circle cx="60.0" cy="417.06675855117334" r="4" fill="#D50A0A" />
+<circle cx="122.85714285714286" cy="343.151648374254" r="4" fill="#D50A0A" />
+<circle cx="185.71428571428572" cy="289.6478291183276" r="4" fill="#D50A0A" />
+<circle cx="248.57142857142856" cy="318.31109321746874" r="4" fill="#D50A0A" />
+<circle cx="311.42857142857144" cy="324.65876489296755" r="4" fill="#D50A0A" />
+<circle cx="374.2857142857143" cy="333.82762397979917" r="4" fill="#D50A0A" />
+<circle cx="437.1428571428571" cy="322.53158958482265" r="4" fill="#D50A0A" />
+<circle cx="500.0" cy="307.1410718601984" r="4" fill="#D50A0A" />
+<circle cx="562.8571428571429" cy="252.21443375315647" r="4" fill="#D50A0A" />
+<circle cx="625.7142857142857" cy="289.5790626751763" r="4" fill="#D50A0A" />
+<circle cx="688.5714285714286" cy="273.9532109006568" r="4" fill="#D50A0A" />
+<circle cx="751.4285714285714" cy="268.2632285404249" r="4" fill="#D50A0A" />
+<circle cx="814.2857142857142" cy="288.29542240301987" r="4" fill="#D50A0A" />
+<circle cx="877.1428571428571" cy="160.75835574732452" r="4" fill="#D50A0A" />
+<circle cx="940.0" cy="159.06740654265695" r="4" fill="#D50A0A" />
+<polyline points="60.0,417.06675855117334 122.85714285714286,343.151648374254 185.71428571428572,289.6478291183276 248.57142857142856,318.31109321746874 311.42857142857144,324.65876489296755 374.2857142857143,333.82762397979917 437.1428571428571,322.53158958482265 500.0,307.1410718601984 562.8571428571429,252.21443375315647 625.7142857142857,289.5790626751763 688.5714285714286,273.9532109006568 751.4285714285714,268.2632285404249 814.2857142857142,288.29542240301987 877.1428571428571,160.75835574732452 940.0,159.06740654265695" fill="none" stroke="#D50A0A" stroke-width="4" />
+<text x="950.0" y="159.06740654265695" font-family="Arial" font-size="14" font-weight="bold" fill="#D50A0A">AFC (Avg)</text>
+<circle cx="60.0" cy="411.88611806816255" r="4" fill="#013369" />
+<circle cx="122.85714285714286" cy="402.78872906241804" r="4" fill="#013369" />
+<circle cx="185.71428571428572" cy="367.9000447422692" r="4" fill="#013369" />
+<circle cx="248.57142857142856" cy="319.21387318909524" r="4" fill="#013369" />
+<circle cx="311.42857142857144" cy="266.70969467258436" r="4" fill="#013369" />
+<circle cx="374.2857142857143" cy="326.42200702505056" r="4" fill="#013369" />
+<circle cx="437.1428571428571" cy="360.0805360843829" r="4" fill="#013369" />
+<circle cx="500.0" cy="309.70999809716784" r="4" fill="#013369" />
+<circle cx="562.8571428571429" cy="320.0902045287405" r="4" fill="#013369" />
+<circle cx="625.7142857142857" cy="292.5659948469249" r="4" fill="#013369" />
+<circle cx="688.5714285714286" cy="206.4756977479725" r="4" fill="#013369" />
+<circle cx="751.4285714285714" cy="125.19905166960672" r="4" fill="#013369" />
+<circle cx="814.2857142857142" cy="103.63636363636368" r="4" fill="#013369" />
+<circle cx="877.1428571428571" cy="148.40331812781898" r="4" fill="#013369" />
+<circle cx="940.0" cy="171.63226997588038" r="4" fill="#013369" />
+<polyline points="60.0,411.88611806816255 122.85714285714286,402.78872906241804 185.71428571428572,367.9000447422692 248.57142857142856,319.21387318909524 311.42857142857144,266.70969467258436 374.2857142857143,326.42200702505056 437.1428571428571,360.0805360843829 500.0,309.70999809716784 562.8571428571429,320.0902045287405 625.7142857142857,292.5659948469249 688.5714285714286,206.4756977479725 751.4285714285714,125.19905166960672 814.2857142857142,103.63636363636368 877.1428571428571,148.40331812781898 940.0,171.63226997588038" fill="none" stroke="#013369" stroke-width="4" />
+<text x="950.0" y="171.63226997588038" font-family="Arial" font-size="14" font-weight="bold" fill="#013369">NFC (Avg)</text>
+</svg>

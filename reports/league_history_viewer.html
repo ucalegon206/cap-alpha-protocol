@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFL League Evolution (2011-2025)</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f4f4f4; margin: 0; padding: 20px; }
+        .container { background: white; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px; max-width: 1100px; width: 100%; text-align: center; }
+        h1 { margin-bottom: 10px; color: #333; }
+        .controls { margin: 20px 0; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+        select, button { padding: 8px 16px; font-size: 16px; min-width: 120px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+        button:hover { background: #eee; }
+        button.active { background: #007bff; color: white; border-color: #0056b3; }
+        input[type=range] { width: 300px; }
+        .chart-container { position: relative; width: 100%; max-width: 900px; margin: 0 auto; min-height: 800px; }
+        img { width: 100%; height: auto; display: none; border: 1px solid #eee; }
+        img.active { display: block; }
+        .year-display { font-size: 24px; font-weight: bold; color: #555; margin-left: 10px; min-width: 60px; display: inline-block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>NFL Strategy Time Machine</h1>
+    <p>Explore the evolution of team efficiency and discipline across the CBA Era.</p>
+    
+    <div class="controls">
+        <select id="metric-select">
+            <option value="dc">Dead Cap Efficiency</option>
+            <option value="pen">Penalty Efficiency</option>
+        </select>
+
+        <button id="play-btn">▶ Play</button>
+        
+        <input type="range" id="year-slider" min="2011" max="2025" value="2011" step="1">
+        <span class="year-display" id="year-label">2011</span>
+    </div>
+
+    <div class="chart-container" id="chart-stage">
+        <!-- Images injected by JS -->
+    </div>
+</div>
+
+<script>
+    const years = Array.from({length: 15}, (_, i) => 2011 + i);
+    const metrics = ['dc', 'pen'];
+    const stage = document.getElementById('chart-stage');
+    const slider = document.getElementById('year-slider');
+    const label = document.getElementById('year-label');
+    const playBtn = document.getElementById('play-btn');
+    const metricSelect = document.getElementById('metric-select');
+    
+    let isPlaying = false;
+    let interval = null;
+
+    // preload
+    function init() {
+        years.forEach(year => {
+            metrics.forEach(metric => {
+                const img = document.createElement('img');
+                img.src = `chart_frames/${metric}_${year}.svg`;
+                img.id = `${metric}-${year}`;
+                if (year === 2011 && metric === 'dc') img.className = 'active';
+                stage.appendChild(img);
+            });
+        });
+        updateView();
+    }
+
+    function updateView() {
+        const year = slider.value;
+        const metric = metricSelect.value;
+        label.textContent = year;
+        
+        // Hide all
+        document.querySelectorAll('.chart-container img').forEach(img => img.classList.remove('active'));
+        
+        // Show selected
+        const target = document.getElementById(`${metric}-${year}`);
+        if (target) target.classList.add('active');
+        else console.warn(`Missing frame: ${metric}-${year}`);
+    }
+
+    slider.addEventListener('input', () => {
+        stopAnimation();
+        updateView();
+    });
+
+    metricSelect.addEventListener('change', () => {
+        updateView();
+    });
+
+    playBtn.addEventListener('click', () => {
+        if (isPlaying) stopAnimation();
+        else startAnimation();
+    });
+
+    function startAnimation() {
+        isPlaying = true;
+        playBtn.textContent = "⏸ Pause";
+        playBtn.classList.add('active');
+        
+        // If at end, restart
+        if (parseInt(slider.value) >= 2025) {
+            slider.value = 2011;
+        }
+
+        interval = setInterval(() => {
+            let current = parseInt(slider.value);
+            if (current >= 2025) {
+                stopAnimation();
+            } else {
+                slider.value = current + 1;
+                updateView();
+            }
+        }, 800); // 800ms per frame
+    }
+
+    function stopAnimation() {
+        isPlaying = false;
+        playBtn.textContent = "▶ Play";
+        playBtn.classList.remove('active');
+        clearInterval(interval);
+    }
+
+    init();
+</script>
+
+</body>
+</html>

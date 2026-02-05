@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" style="background-color:white;">
+<text x="500.0" y="30" font-family="Arial" font-size="24" text-anchor="middle" font-weight="bold">The Toxic Debt Trap: Dead Cap % (2015-2024)</text>
+<line x1="60" y1="540.0" x2="940" y2="540.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="545.0" font-family="Arial" font-size="12" text-anchor="end">0%</text>
+<line x1="60" y1="420.0" x2="940" y2="420.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="425.0" font-family="Arial" font-size="12" text-anchor="end">10%</text>
+<line x1="60" y1="300.0" x2="940" y2="300.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="305.0" font-family="Arial" font-size="12" text-anchor="end">20%</text>
+<line x1="60" y1="180.0" x2="940" y2="180.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="185.0" font-family="Arial" font-size="12" text-anchor="end">30%</text>
+<line x1="60" y1="60.0" x2="940" y2="60.0" stroke="#eee" stroke-width="1" />
+<text x="50" y="65.0" font-family="Arial" font-size="12" text-anchor="end">40%</text>
+<text x="60.0" y="560" font-family="Arial" font-size="12" text-anchor="middle">2015</text>
+<text x="157.77777777777777" y="560" font-family="Arial" font-size="12" text-anchor="middle">2016</text>
+<text x="255.55555555555554" y="560" font-family="Arial" font-size="12" text-anchor="middle">2017</text>
+<text x="353.3333333333333" y="560" font-family="Arial" font-size="12" text-anchor="middle">2018</text>
+<text x="451.1111111111111" y="560" font-family="Arial" font-size="12" text-anchor="middle">2019</text>
+<text x="548.8888888888889" y="560" font-family="Arial" font-size="12" text-anchor="middle">2020</text>
+<text x="646.6666666666666" y="560" font-family="Arial" font-size="12" text-anchor="middle">2021</text>
+<text x="744.4444444444443" y="560" font-family="Arial" font-size="12" text-anchor="middle">2022</text>
+<text x="842.2222222222222" y="560" font-family="Arial" font-size="12" text-anchor="middle">2023</text>
+<text x="940.0" y="560" font-family="Arial" font-size="12" text-anchor="middle">2024</text>
+<rect x="60" y="396.0" width="880" height="144.0" fill="green" fill-opacity="0.1" />
+<text x="930" y="416.0" font-family="Arial" font-size="12" fill="green" text-anchor="end">Efficient Zone (Under 12%)</text>
+<circle cx="60.0" cy="489.12" r="4" fill="#FF5500" />
+<circle cx="157.77777777777777" cy="416.64" r="4" fill="#FF5500" />
+<circle cx="255.55555555555554" cy="498.12" r="4" fill="#FF5500" />
+<circle cx="353.3333333333333" cy="361.68" r="4" fill="#FF5500" />
+<circle cx="451.1111111111111" cy="329.88" r="4" fill="#FF5500" />
+<circle cx="548.8888888888889" cy="384.36" r="4" fill="#FF5500" />
+<circle cx="646.6666666666666" cy="303.36" r="4" fill="#FF5500" />
+<circle cx="744.4444444444443" cy="343.44" r="4" fill="#FF5500" />
+<circle cx="842.2222222222222" cy="367.56000000000006" r="4" fill="#FF5500" />
+<circle cx="940.0" cy="116.04000000000002" r="4" fill="#FF5500" />
+<text x="945.0" y="116.04000000000002" font-family="Arial" font-size="12" font-weight="bold" fill="#FF5500">DEN 35.3%</text>
+<polyline points="60.0,489.12 157.77777777777777,416.64 255.55555555555554,498.12 353.3333333333333,361.68 451.1111111111111,329.88 548.8888888888889,384.36 646.6666666666666,303.36 744.4444444444443,343.44 842.2222222222222,367.56000000000006 940.0,116.04000000000002" fill="none" stroke="#FF5500" stroke-width="3" />
+<circle cx="60.0" cy="380.15999999999997" r="4" fill="#00FF00" />
+<circle cx="157.77777777777777" cy="426.96000000000004" r="4" fill="#00FF00" />
+<circle cx="255.55555555555554" cy="487.2" r="4" fill="#00FF00" />
+<circle cx="353.3333333333333" cy="384.24" r="4" fill="#00FF00" />
+<circle cx="451.1111111111111" cy="369.0" r="4" fill="#00FF00" />
+<circle cx="548.8888888888889" cy="441.72" r="4" fill="#00FF00" />
+<circle cx="646.6666666666666" cy="443.28" r="4" fill="#00FF00" />
+<circle cx="744.4444444444443" cy="220.92000000000002" r="4" fill="#00FF00" />
+<circle cx="842.2222222222222" cy="409.44" r="4" fill="#00FF00" />
+<circle cx="940.0" cy="263.52000000000004" r="4" fill="#00FF00" />
+<text x="945.0" y="263.52000000000004" font-family="Arial" font-size="12" font-weight="bold" fill="#00FF00">SEA 23.0%</text>
+<polyline points="60.0,380.15999999999997 157.77777777777777,426.96000000000004 255.55555555555554,487.2 353.3333333333333,384.24 451.1111111111111,369.0 548.8888888888889,441.72 646.6666666666666,443.28 744.4444444444443,220.92000000000002 842.2222222222222,409.44 940.0,263.52000000000004" fill="none" stroke="#00FF00" stroke-width="3" />
+<circle cx="60.0" cy="374.52" r="4" fill="#0000FF" />
+<circle cx="157.77777777777777" cy="397.56000000000006" r="4" fill="#0000FF" />
+<circle cx="255.55555555555554" cy="487.08" r="4" fill="#0000FF" />
+<circle cx="353.3333333333333" cy="465.0" r="4" fill="#0000FF" />
+<circle cx="451.1111111111111" cy="379.68" r="4" fill="#0000FF" />
+<circle cx="548.8888888888889" cy="347.4" r="4" fill="#0000FF" />
+<circle cx="646.6666666666666" cy="339.0" r="4" fill="#0000FF" />
+<circle cx="744.4444444444443" cy="432.72" r="4" fill="#0000FF" />
+<circle cx="842.2222222222222" cy="371.04" r="4" fill="#0000FF" />
+<circle cx="940.0" cy="221.28000000000003" r="4" fill="#0000FF" />
+<text x="945.0" y="221.28000000000003" font-family="Arial" font-size="12" font-weight="bold" fill="#0000FF">NE 26.6%</text>
+<polyline points="60.0,374.52 157.77777777777777,397.56000000000006 255.55555555555554,487.08 353.3333333333333,465.0 451.1111111111111,379.68 548.8888888888889,347.4 646.6666666666666,339.0 744.4444444444443,432.72 842.2222222222222,371.04 940.0,221.28000000000003" fill="none" stroke="#0000FF" stroke-width="3" />
+<circle cx="60.0" cy="385.2" r="4" fill="#00AAAA" />
+<circle cx="157.77777777777777" cy="349.08000000000004" r="4" fill="#00AAAA" />
+<circle cx="255.55555555555554" cy="403.8" r="4" fill="#00AAAA" />
+<circle cx="353.3333333333333" cy="435.72" r="4" fill="#00AAAA" />
+<circle cx="451.1111111111111" cy="387.24" r="4" fill="#00AAAA" />
+<circle cx="548.8888888888889" cy="398.52" r="4" fill="#00AAAA" />
+<circle cx="646.6666666666666" cy="135.48000000000002" r="4" fill="#00AAAA" />
+<circle cx="744.4444444444443" cy="187.32" r="4" fill="#00AAAA" />
+<circle cx="842.2222222222222" cy="209.87999999999994" r="4" fill="#00AAAA" />
+<circle cx="940.0" cy="235.56" r="4" fill="#00AAAA" />
+<text x="945.0" y="235.56" font-family="Arial" font-size="12" font-weight="bold" fill="#00AAAA">PHI 25.4%</text>
+<polyline points="60.0,385.2 157.77777777777777,349.08000000000004 255.55555555555554,403.8 353.3333333333333,435.72 451.1111111111111,387.24 548.8888888888889,398.52 646.6666666666666,135.48000000000002 744.4444444444443,187.32 842.2222222222222,209.87999999999994 940.0,235.56" fill="none" stroke="#00AAAA" stroke-width="3" />
+<circle cx="60.0" cy="357.24" r="4" fill="#FFD700" />
+<circle cx="157.77777777777777" cy="428.4" r="4" fill="#FFD700" />
+<circle cx="255.55555555555554" cy="425.15999999999997" r="4" fill="#FFD700" />
+<circle cx="353.3333333333333" cy="384.96000000000004" r="4" fill="#FFD700" />
+<circle cx="451.1111111111111" cy="389.03999999999996" r="4" fill="#FFD700" />
+<circle cx="548.8888888888889" cy="439.8" r="4" fill="#FFD700" />
+<circle cx="646.6666666666666" cy="424.68" r="4" fill="#FFD700" />
+<circle cx="744.4444444444443" cy="444.12" r="4" fill="#FFD700" />
+<circle cx="842.2222222222222" cy="472.2" r="4" fill="#FFD700" />
+<circle cx="940.0" cy="458.28" r="4" fill="#FFD700" />
+<text x="945.0" y="458.28" font-family="Arial" font-size="12" font-weight="bold" fill="#FFD700">KC 6.8%</text>
+<polyline points="60.0,357.24 157.77777777777777,428.4 255.55555555555554,425.15999999999997 353.3333333333333,384.96000000000004 451.1111111111111,389.03999999999996 548.8888888888889,439.8 646.6666666666666,424.68 744.4444444444443,444.12 842.2222222222222,472.2 940.0,458.28" fill="none" stroke="#FFD700" stroke-width="3" />
+</svg>

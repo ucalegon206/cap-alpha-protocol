@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>NFL Efficiency Evolution (Fluid)</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            max-width: 1000px;
+            width: 100%;
+            position: relative;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button,
+        select {
+            padding: 10px 18px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #f0f0f0;
+        }
+
+        button.active {
+            background: #007bff;
+            color: white;
+            border-color: #0069d9;
+        }
+
+        /* The Chart Stage */
+        #chart-svg {
+            width: 100%;
+            height: auto;
+            border: 1px solid #eee;
+            background: white;
+            display: block;
+            overflow: visible;
+        }
+
+        /* Team Markers (Fluid Motion) */
+        .team-marker {
+            transition: cx 1.0s cubic-bezier(0.5, 0, 0.2, 1),
+                cy 1.0s cubic-bezier(0.5, 0, 0.2, 1),
+                opacity 0.5s ease;
+        }
+
+        /* Narrative Overlay */
+        .narrative-box {
+            background: rgba(255, 255, 255, 0.95);
+            border-left: 5px solid #007bff;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+        }
+
+        .narrative-year {
+            font-size: 28px;
+            font-weight: bold;
+            color: #007bff;
+            margin-right: 20px;
+            min-width: 70px;
+        }
+
+        .narrative-text {
+            font-size: 18px;
+            color: #444;
+        }
+
+        .slider-container {
+            margin-top: 20px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            height: 6px;
+        }
+
+        /* Zones */
+        .zone-text {
+            font-family: Arial;
+            font-weight: bold;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>NFL Efficiency Frontier (Fluid)</h1>
+            <div class="controls">
+                <select id="metric-select">
+                    <option value="dc">Dead Cap (Risk)</option>
+                    <option value="pen">Penalty (Discipline)</option>
+                </select>
+                <button id="play-btn">▶ Play</button>
+            </div>
+        </div>
+
+        <!-- SVG Stage -->
+        <svg id="chart-svg" viewBox="0 0 1000 1000">
+            <!-- Background Zones -->
+            <rect x="80" y="80" width="313" height="420" fill="#E6F4EA" />
+            <text x="100" y="120" class="zone-text" fill="#137333" font-size="24">DYNASTY ZONE</text>
+
+            <rect x="393" y="500" width="527" height="420" fill="#FCE8E6" />
+            <text x="880" y="880" class="zone-text" fill="#C5221F" font-size="24" text-anchor="end">CAP HELL</text>
+
+            <!-- Axes lines -->
+            <line x1="80" y1="920" x2="920" y2="920" stroke="#333" stroke-width="3" />
+            <line x1="80" y1="80" x2="80" y2="920" stroke="#333" stroke-width="3" />
+
+            <!-- Center Lines -->
+            <line x1="80" y1="500" x2="920" y2="500" stroke="#ccc" stroke-width="2" stroke-dasharray="5,5" />
+            <line x1="393" y1="80" x2="393" y2="920" stroke="#ccc" stroke-width="2" stroke-dasharray="5,5" />
+            <!-- Approx 15% DC line -->
+
+            <!-- Team Group -->
+            <g id="teams-layer"></g>
+        </svg>
+
+        <div class="slider-container">
+            <input type="range" id="year-slider" min="2011" max="2025" value="2011" step="1">
+        </div>
+
+        <div class="narrative-box">
+            <span class="narrative-year" id="year-display">2011</span>
+            <span class="narrative-text" id="narrative-text">Loading Data...</span>
+        </div>
+    </div>
+
+    <script src="league_data.js"></script>
+    <script>
+        // Configuration
+        const CONFIG = {
+            padding: 80,
+            width: 1000,
+            height: 1000,
+            xMaxDC: 50,
+            xMaxPen: 1400,
+            xMinPen: 200,
+            yMax: 1.0
+        };
+
+        const NARRATIVES = {
+            2011: "The New CBA Era Begins. Teams reset their books.",
+            2012: "Russell Wilson drafted. Seattle enters the 'Rookie Contract Window'.",
+            2013: "The Legion of Boom Peak. Seattle wins Super Bowl XLVIII with elite efficiency.",
+            2014: "New England Dynasty Resurgence. Belichick maintains peak discipline.",
+            2015: "Denver's Defense carries Manning. High leverage, high reward.",
+            2016: "The Falcons Collapse. Offense peaks, but cracks appear.",
+            2017: "The Eagles 'All-In' Backup Plan. Foles wins it all.",
+            2018: "The Rams 'All-In' Gamble Begins. Trading picks for stars.",
+            2019: "The Chiefs Era Begins. Mahomes on rookie deal dominates.",
+            2020: "The COVID Season. Cap drops creates chaos for leverage teams.",
+            2021: "The Rams Win It All. 'F--- Them Picks' strategy pays off.",
+            2022: "Seattle's Dead Cap Spike. The Russell Wilson trade clears the books.",
+            2023: "The Cap Reset. Teams like the Rams and Bucs pay the bill.",
+            2024: "The Modern Efficiency Frontier. Playoff teams cluster in the Green Zone.",
+            2025: "The Future State. Projected cap space and roster churn."
+        };
+
+        let currentMetric = 'dc';
+        let isPlaying = false;
+        let timer = null;
+
+        // DOM Elements
+        const teamLayer = document.getElementById('teams-layer');
+        const slider = document.getElementById('year-slider');
+        const yearDisplay = document.getElementById('year-display');
+        const narrativeText = document.getElementById('narrative-text');
+        const playBtn = document.getElementById('play-btn');
+        const metricSelect = document.getElementById('metric-select');
+
+        function init() {
+            // Create SVG elements for all teams once
+            const teams = Object.keys(LEAGUE_DATA.teams);
+
+            teams.forEach(team => {
+                const data = LEAGUE_DATA.teams[team];
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute("class", "team-marker");
+                g.setAttribute("id", `team-${team}`);
+
+                // Logo Image
+                if (data.logo) {
+                    const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+                    img.setAttribute("href", data.logo);
+                    img.setAttribute("width", "60");
+                    img.setAttribute("height", "60");
+                    img.setAttribute("x", "-30"); // Center anchor
+                    img.setAttribute("y", "-30");
+                    g.appendChild(img);
+                } else {
+                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute("r", "10");
+                    circle.setAttribute("fill", data.color);
+                    g.appendChild(circle);
+                }
+
+                // Tooltip (Simple Title)
+                const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                title.textContent = data.name;
+                g.appendChild(title);
+
+                teamLayer.appendChild(g);
+            });
+
+            updateView();
+        }
+
+        function getCoords(team, year) {
+            const tData = LEAGUE_DATA.teams[team];
+            const h = tData.history[year];
+
+            if (!h) return { x: 500, y: 500, opacity: 0 }; // Hidden if no data
+
+            let xVal = 0;
+            let xPct = 0;
+
+            if (currentMetric === 'dc') {
+                xVal = h.dc;
+                if (xVal > CONFIG.xMaxDC) xVal = CONFIG.xMaxDC;
+                xPct = xVal / CONFIG.xMaxDC;
+            } else {
+                // Penalties (Inverse range 200-1400)
+                xVal = h.pen;
+                if (xVal > CONFIG.xMaxPen) xVal = CONFIG.xMaxPen;
+                if (xVal < CONFIG.xMinPen) xVal = CONFIG.xMinPen;
+                xPct = (xVal - CONFIG.xMinPen) / (CONFIG.xMaxPen - CONFIG.xMinPen);
+            }
+
+            const xPx = CONFIG.padding + (xPct * (CONFIG.width - 2 * CONFIG.padding));
+            const yPx = CONFIG.height - CONFIG.padding - (h.win / CONFIG.yMax * (CONFIG.height - 2 * CONFIG.padding));
+
+            return { x: xPx, y: yPx, opacity: 1 };
+        }
+
+        function updateView() {
+            const year = parseInt(slider.value);
+            yearDisplay.textContent = year;
+            narrativeText.textContent = NARRATIVES[year] || "analyzing...";
+
+            // Update All Teams
+            const teams = Object.keys(LEAGUE_DATA.teams);
+            teams.forEach(team => {
+                const el = document.getElementById(`team-${team}`);
+                const coords = getCoords(team, year);
+
+                // Use transform checks if supported, or cx/cy if circle vs image wrap
+                // Actually best is to transform the Group <g>
+                el.setAttribute("transform", `translate(${coords.x}, ${coords.y})`);
+                el.setAttribute("opacity", coords.opacity);
+            });
+        }
+
+        // Controls
+        slider.addEventListener('input', () => {
+            stopAnimation();
+            updateView();
+        });
+
+        metricSelect.addEventListener('change', (e) => {
+            currentMetric = e.target.value;
+            updateView();
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (isPlaying) stopAnimation();
+            else startAnimation();
+        });
+
+        function startAnimation() {
+            isPlaying = true;
+            playBtn.textContent = "⏸ Pause";
+            playBtn.classList.add('active');
+
+            if (parseInt(slider.value) >= 2025) slider.value = 2011;
+
+            timer = setInterval(() => {
+                let curr = parseInt(slider.value);
+                if (curr >= 2025) {
+                    stopAnimation();
+                } else {
+                    slider.value = curr + 1;
+                    updateView();
+                }
+            }, 1200); // Slower for fluid feel
+        }
+
+        function stopAnimation() {
+            isPlaying = false;
+            playBtn.textContent = "▶ Play";
+            playBtn.classList.remove('active');
+            clearInterval(timer);
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+
+</html>

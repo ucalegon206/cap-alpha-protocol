@@ -76,7 +76,7 @@ class RiskModeler:
         plt.figure(figsize=(10, 6))
         shap.summary_plot(shap_values, X_test, show=False)
         plt.tight_layout()
-        plt.savefig("reports/shap_summary.png")
+        plt.savefig("reports/shap_summary.png", dpi=300, bbox_inches='tight')
         logger.info("✓ SHAP summary plot saved to reports/shap_summary.png")
         
         return shap_values
