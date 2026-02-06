@@ -10,8 +10,9 @@ from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+from src.config_loader import get_db_path
 
-DB_PATH = "data/nfl_data.db"
+DB_PATH = get_db_path()
 
 class FeaturePruner:
     def __init__(self, db_path=DB_PATH):

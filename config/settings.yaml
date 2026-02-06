@@ -1,12 +1,25 @@
 project:
   name: "nfl-dead-money"
-  version: "2.0.0"
+  version: "2.1.0"
   current_season: 2025
 
+# Medallion Data Architecture
+data:
+  bronze: "data/bronze"      # Raw, immutable source data
+  silver: "data/silver"      # Cleaned, typed, normalized
+  gold: "data/gold"          # Feature-ready for ML
+  duckdb: "data/duckdb"      # DuckDB database files
+
+database:
+  # Primary production database - contains Silver and Gold layers
+  path: "data/duckdb/nfl_production.db"
+
+models:
+  directory: "models"
+  fallback_directory: "/tmp/models"
+  registry: "models/registry.json"
+
 paths:
-  data_raw: "data_raw"
-  data_processed: "data_processed"
-  models: "models"
   reports: "reports"
   viz: "viz"
 

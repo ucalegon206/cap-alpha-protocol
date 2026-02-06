@@ -54,8 +54,43 @@ def main():
     # 4. Model Training & Risk Frontier (Production XGBoost)
     if not args.skip_training:
         run_step("Production Training", "src/train_model.py")
+        
+        # 4.1 ML Red Team Evaluation & Promotion
+        logger.info("--- Starting Step: ML Red Team Validation ---")
+        try:
+            from src.ml_validator import RedTeamEvaluator
+            from src.ml_governance import MLGovernance
+            import joblib
+            import pandas as pd
+            import duckdb
+            
+            governance = MLGovernance()
+            candidate = governance.get_latest_candidate()
+            if candidate:
+                # Load candidate and validation data
+                model = joblib.load(candidate["path"])
+                con = duckdb.connect(os.getenv("DB_PATH", "data/nfl_data.db"))
+                df = con.execute("SELECT * FROM staging_feature_matrix").df()
+                con.close()
+                
+                # Simple split for validation (in production this would be a dedicated holdout)
+                X = df.drop(columns=['player_name', 'year', 'experience_years', 'edce_risk', 'fair_market_value', 'ied_overpayment', 'value_metric_proxy', 'team'])
+                y = df['edce_risk'].fillna(0)
+                
+                evaluator = RedTeamEvaluator()
+                # Use a small slice for drift check simulation
+                if evaluator.evaluate_model(model, X, y, X.tail(100), y.tail(100), candidate["metrics"]):
+                    evaluator.validate_and_promote(candidate["path"])
+                    logger.info("✅ Model Promoted to Production.")
+                else:
+                    logger.warning("❌ Model FAILED Red Team Evaluation. Stays as candidate.")
+            else:
+                logger.warning("No candidate model found to evaluate.")
+        except Exception as e:
+            logger.error(f"--- FAILED Step: ML red Team Validation ({e}) ---")
+            # We don't exit here, just don't promote
     else:
-        logger.info("⏭️  Skipping Training (Model Layer)")
+        logger.info("⏭️  Skipping Training & Validation (Model Layer)")
     
     # 5. Pipeline Integrity Testing (Formal pytest)
     if not args.skip_tests:

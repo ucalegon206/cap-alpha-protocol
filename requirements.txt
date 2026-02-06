@@ -20,3 +20,6 @@ requests
 psutil
 tqdm
 pyarrow
+selenium
+webdriver-manager
+pyyaml

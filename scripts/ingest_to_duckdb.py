@@ -15,8 +15,12 @@ from src.financial_ingestion import load_team_financials, load_player_merch
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.getenv("DB_PATH", "data/nfl_data.db")
-RAW_DIR = Path("data/raw")
+# Medallion Architecture: Silver/Gold layer database
+from src.config_loader import get_db_path, get_bronze_dir
+
+DB_PATH = get_db_path()
+# Medallion Architecture: Bronze layer is the source of truth
+BRONZE_DIR = get_bronze_dir()
 
 def clean_doubled_name(name):
     if not isinstance(name, str): return name
@@ -53,53 +57,75 @@ def find_targeted_files(pattern_name: str, year: int, week: int = None):
     if year is None:
         raise ValueError("Year parameter is required for explicit ingestion.")
         
-    year_dir = RAW_DIR / str(year)
+    # Look in source-specific subdirectories under bronze
+    # Try spotrac first for contract/ranking files
+    source_dirs = ['spotrac', 'pfr', 'penalties', 'dead_money']
     
-    # Legacy Fallback (Top-level files) for historical backfills or manual imports
-    if not year_dir.exists() or week is None:
-        legacy = list(RAW_DIR.glob(f"{pattern_name}_{year}_*.csv"))
-        if legacy:
-            # Sort by timestamp in filename if present
-             legacy.sort()
-             logger.info(f"Using legacy file for {pattern_name} ({year}): {legacy[-1]}")
-             return [legacy[-1]]
+    for source in source_dirs:
+        year_dir = BRONZE_DIR / source / str(year)
+    
+        # Check if files exist in this source/year directory
+        if year_dir.exists():
+            files = list(year_dir.glob(f"{pattern_name}*.csv"))
+            if files:
+                files.sort()
+                logger.info(f"Found {pattern_name} in {year_dir}: {files[-1].name}")
+                return [files[-1]]
              
-    if not year_dir.exists():
-        logger.warning(f"Year directory {year_dir} does not exist and no legacy files found.")
-        return []
-
-    target_pattern = f"week_{week}_*" if week else "*"
-    subdirs = sorted([d for d in year_dir.glob(target_pattern) if d.is_dir()])
-
-    # If multiple timestamps for same week, take latest (Repair/Resync logic)
-    target_dir = subdirs[-1]
-    logger.info(f"Targeting source data: {target_dir}")
-    
-    # Verify file exists in that dir
-    files = list(target_dir.glob(f"{pattern_name}*.csv"))
-    return [files[0]] if files else []
+    # No files found in any source directory
+    logger.warning(f"No files found for {pattern_name} ({year}) in bronze layer")
+    return []
 
 def ingest_spotrac(year: int, week: int):
     con = duckdb.connect(DB_PATH)
     logger.info(f"Ingesting Spotrac (Year={year}, Week={week}) - Upsert Mode")
     
     files = find_targeted_files("spotrac_player_contracts", year, week)
+    
+    # FALLBACK: Use rankings data as contract source if no contract file exists
+    use_rankings_fallback = False
     if not files:
-        logger.warning("Skipping Spotrac ingest: No file found.")
-        con.close()
-        return
+        files = find_targeted_files("spotrac_player_rankings", year, week)
+        if files:
+            use_rankings_fallback = True
+            logger.info(f"Using rankings as fallback contract source for {year}")
+        else:
+            logger.warning("Skipping Spotrac ingest: No file found.")
+            con.close()
+            return
 
     # Ingest Temporary Table
     df = pd.read_csv(files[0])
     df['player_name'] = df['player_name'].apply(clean_doubled_name)
     
+    # SCHEMA NORMALIZATION: Handle column variations across years
+    # Rename common variants to standard names
+    column_mappings = {
+        'total_contract_value_millions': 'cap_hit_millions',
+        'guaranteed_money_millions': 'dead_cap_millions',
+    }
+    df = df.rename(columns=column_mappings)
+    
+    # Ensure required columns exist with defaults
+    required_cols = ['cap_hit_millions', 'dead_cap_millions', 'age', 'signing_bonus_millions']
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
+    
     # UPSERT Logic: Contracts
     con.execute("CREATE TABLE IF NOT EXISTS silver_spotrac_contracts AS SELECT * FROM df LIMIT 0")
+    # Schema evolution: add any new columns from DF
+    existing_cols = con.execute("PRAGMA table_info('silver_spotrac_contracts')").df()['name'].tolist()
+    for col in df.columns:
+        if col not in existing_cols:
+            logger.info(f"Adding column {col} to silver_spotrac_contracts")
+            con.execute(f'ALTER TABLE silver_spotrac_contracts ADD COLUMN "{col}" VARCHAR')
     con.execute(f"DELETE FROM silver_spotrac_contracts WHERE year = {year}")
     # Enforce uniqueness at ingestion to prevent row explosion
     con.execute("INSERT INTO silver_spotrac_contracts BY NAME SELECT DISTINCT * FROM df")
     count = con.execute(f"SELECT COUNT(*) FROM silver_spotrac_contracts WHERE year = {year}").fetchone()[0]
     logger.info(f"✓ Upserted {count} rows into silver_spotrac_contracts for {year}")
+
 
     # Dead Money
     sal_files = find_targeted_files("spotrac_player_salaries", year, week)
@@ -147,9 +173,9 @@ def ingest_pfr(year: int, week: int):
     
     files = find_targeted_files("pfr_game_logs", year, week)
     if not files:
-        # PFR legacy files are often named 'game_logs_{year}.csv'
-        # Search recursively in data/raw
-        files = list(RAW_DIR.rglob(f"game_logs_{year}.csv"))
+        # PFR files are in data/bronze/pfr/{year}/
+        pfr_dir = BRONZE_DIR / "pfr" / str(year)
+        files = list(pfr_dir.glob(f"game_logs_{year}.csv")) if pfr_dir.exists() else []
         if files: logger.info(f"Using legacy PFR file: {files[0]}")
         
     if not files:
@@ -182,18 +208,26 @@ def ingest_pfr(year: int, week: int):
 def ingest_financials():
     # Financials are static for now, no partition logic needed yet
     con = duckdb.connect(DB_PATH)
-    fin_path = RAW_DIR / "finance/team_valuations_2024.csv"
-    load_team_financials(con, fin_path)
-    merch_path = RAW_DIR / "merch/nflpa_player_sales_2024.csv"
-    load_player_merch(con, merch_path)
+    fin_path = BRONZE_DIR / "other" / "finance" / "team_valuations_2024.csv"
+    if fin_path.exists():
+        load_team_financials(con, fin_path)
+    else:
+        logger.warning(f"Financial data not found at {fin_path}")
+    merch_path = BRONZE_DIR / "other" / "merch" / "nflpa_player_sales_2024.csv"
+    if merch_path.exists():
+        load_player_merch(con, merch_path)
+    else:
+        logger.warning(f"Merch data not found at {merch_path}")
     con.close()
+
 
 def ingest_penalties(year: int):
     con = duckdb.connect(DB_PATH)
     logger.info(f"Ingesting Penalties (Year={year})")
     
-    # Penalties are usually by year, no week partition in our raw storage for this source yet
-    files = list(RAW_DIR.glob(f"penalties/improved_penalties_{year}_*.csv"))
+    # Penalties are in data/bronze/penalties/{year}/
+    penalties_dir = BRONZE_DIR / "penalties" / str(year)
+    files = list(penalties_dir.glob(f"improved_penalties_{year}_*.csv")) if penalties_dir.exists() else []
     if not files:
         logger.warning(f"No penalty files found for {year}")
         con.close()
@@ -230,9 +264,11 @@ def ingest_penalties(year: int):
 def ingest_team_cap():
     con = duckdb.connect(DB_PATH)
     logger.info("Ingesting Team Cap & Record data (Historical)...")
-    files = list(Path("data_raw/dead_money").glob("team_cap_*.csv"))
+    # Team cap files are in data/bronze/dead_money/{year}/
+    dead_money_dir = BRONZE_DIR / "dead_money"
+    files = list(dead_money_dir.rglob("team_cap_*.csv"))
     if not files:
-        logger.warning("No team cap files found in data_raw/dead_money")
+        logger.warning("No team cap files found in data/bronze/dead_money")
         con.close()
         return
         
@@ -273,6 +309,19 @@ def create_gold_layer():
         )
     """)
     logger.info("✓ Provisioned baseline silver_player_metadata schema (Empty).")
+
+    # Provision optional tables that may not exist
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS silver_player_merch (
+            Player VARCHAR, Rank INTEGER
+        )
+    """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS silver_team_finance (
+            Team VARCHAR, Year INTEGER, Revenue_M FLOAT, OperatingIncome_M FLOAT
+        )
+    """)
+    logger.info("✓ Provisioned optional stub tables (merch, finance).")
 
     logger.info("Building Gold Layer: fact_player_efficiency...")
     

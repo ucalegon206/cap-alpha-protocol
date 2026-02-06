@@ -6,15 +6,15 @@ import logging
 import xgboost as xgb
 import shap
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import os
-DB_PATH = os.getenv("DB_PATH", "data/nfl_data.db")
+from src.config_loader import get_db_path
+
+DB_PATH = get_db_path()
 MODEL_DIR = Path("/tmp/models")
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -39,36 +39,36 @@ class RiskModeler:
         
         return X, y, metadata
 
-    def train_xgboost(self, X, y):
-        logger.info("Training Production XGBoost Model...")
+    def train_xgboost(self, X, y, metadata):
+        logger.info("Training Production XGBoost Model (with Walk-Forward Validation)...")
         
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        # 1. Run Backtest First
+        from src.backtesting import WalkForwardValidator
+        validator = WalkForwardValidator()
+        backtest_results = validator.run_backtest(X, y, metadata)
+        validator.generate_report(backtest_results)
         
-        # Hyperparameters for transparency and stability
-        model = xgb.XGBRegressor(
-            n_estimators=1000,
-            learning_rate=0.05,
-            max_depth=6,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            n_jobs=-1,
-            random_state=42,
-            early_stopping_rounds=50
-        )
+        # 2. Train Final Production Model on ALL History
+        # We use all available data to predict the "unknown" future (2025/2026)
+        logger.info("Training Final Production Model on full history...")
         
-        model.fit(
-            X_train, y_train,
-            eval_set=[(X_test, y_test)],
-            verbose=False
-        )
+        # Use config params
+        import yaml
+        with open("config/ml_config.yaml", "r") as f:
+             config = yaml.safe_load(f)
+        params = config["models"]["xgboost"]["params"]
         
-        preds = model.predict(X_test)
-        rmse = np.sqrt(mean_squared_error(y_test, preds))
-        r2 = r2_score(y_test, preds)
+        model = xgb.XGBRegressor(**params)
+        model.fit(X, y, verbose=False)
         
-        logger.info(f"✓ Model Trained. RMSE: {rmse:.4f}, R2: {r2:.4f}")
-        return model, X_test
-
+        # 3. Use the latest fold's test set as a proxy for "X_test" for SHAP/Metrics
+        # This is strictly for reporting purposes
+        latest_year = metadata['year'].max()
+        test_mask = metadata['year'] == latest_year
+        X_test_proxy = X[test_mask]
+        
+        logger.info(f"✓ Model Trained on full history ({len(X)} rows).")
+        return model, X_test_proxy, backtest_results
     def generate_shap_report(self, model, X_test):
         logger.info("Generating SHAP Transparency Explainer...")
         explainer = shap.TreeExplainer(model)
@@ -83,10 +83,12 @@ class RiskModeler:
         
         return shap_values
 
-    def save_predictions(self, model, X, metadata):
+    def save_predictions(self, model, X, metadata, metrics):
         import joblib
         import json
+        import yaml
         from datetime import datetime
+        from src.ml_governance import MLGovernance
         
         logger.info("Saving Predictions and Model Artifacts...")
         
@@ -96,31 +98,38 @@ class RiskModeler:
         self.con.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata")
         logger.info("✓ Predictions persisted to 'prediction_results' table.")
         
-        # 2. Save Model Artifact (MLE Skill)
+        # 2. Save Model Artifact
+        with open("config/ml_config.yaml", "r") as f:
+            ml_config = yaml.safe_load(f)
+            
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_path = MODEL_DIR / f"xgboost_risk_model_{timestamp}.pkl"
+        model_filename = ml_config["models"]["xgboost"]["file_pattern"].format(timestamp=timestamp)
+        model_path = MODEL_DIR / model_filename
         joblib.dump(model, model_path)
         logger.info(f"✓ Model artifact saved to: {model_path}")
         
-        # 3. Save Model Metadata (MLE Skill)
-        feature_names = list(X.columns)
-        with open(MODEL_DIR / "feature_names.json", "w") as f:
-            json.dump(feature_names, f)
-            
-        meta = {
-            "training_timestamp": timestamp,
-            "feature_count": len(feature_names),
-            "feature_names": feature_names,
-            "model_params": model.get_params(),
-            "metrics": "See logs (RMSE/R2)"
-        }
-        with open(MODEL_DIR / f"model_meta_{timestamp}.json", "w") as f:
-            json.dump(meta, f, indent=2)
-        logger.info("✓ Model metadata and feature names saved.")
+        # 3. Register as Candidate
+        governance = MLGovernance()
+        governance.register_candidate(
+            model_path=model_path,
+            metrics=metrics,
+            feature_names=list(X.columns)
+        )
+        logger.info("✓ Model registered in governance registry.")
 
 if __name__ == "__main__":
     modeler = RiskModeler()
     X, y, metadata = modeler.prepare_data()
-    model, X_test = modeler.train_xgboost(X, y)
+    model, X_test, backtest_results = modeler.train_xgboost(X, y, metadata)
+    
+    # Validation against config thresholds using AVERAGE backtest performance
+    avg_rmse = backtest_results['rmse'].mean()
+    avg_r2 = backtest_results['r2'].mean()
+    
+    metrics = {
+        "rmse": float(avg_rmse),
+        "r2": float(avg_r2)
+    }
+    
     modeler.generate_shap_report(model, X_test)
-    modeler.save_predictions(model, X, metadata)
+    modeler.save_predictions(model, X, metadata, metrics)

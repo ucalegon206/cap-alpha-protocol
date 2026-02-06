@@ -16,16 +16,24 @@ def load_config():
 
 _config = load_config()
 
-# Expose Paths
-DATA_RAW_DIR = BASE_DIR / _config["paths"]["data_raw"]
-DATA_PROCESSED_DIR = BASE_DIR / _config["paths"]["data_processed"]
-MODELS_DIR = BASE_DIR / _config["paths"]["models"]
-REPORTS_DIR = BASE_DIR / _config["paths"]["reports"]
-VIZ_DIR = BASE_DIR / _config["paths"]["viz"]
+# Expose Paths - Medallion Architecture
+DATA_BRONZE_DIR = BASE_DIR / _config.get("data", {}).get("bronze", "data/bronze")
+DATA_SILVER_DIR = BASE_DIR / _config.get("data", {}).get("silver", "data/silver")
+DATA_GOLD_DIR = BASE_DIR / _config.get("data", {}).get("gold", "data/gold")
+DATA_DUCKDB_DIR = BASE_DIR / _config.get("data", {}).get("duckdb", "data/duckdb")
+
+# Legacy aliases for backward compatibility
+DATA_RAW_DIR = DATA_BRONZE_DIR
+DATA_PROCESSED_DIR = DATA_SILVER_DIR
+
+MODELS_DIR = BASE_DIR / _config.get("models", {}).get("directory", "models")
+REPORTS_DIR = BASE_DIR / _config.get("paths", {}).get("reports", "reports")
+VIZ_DIR = BASE_DIR / _config.get("paths", {}).get("viz", "viz")
 
 # Global Constants
-CURRENT_SEASON = _config["project"]["current_season"]
+CURRENT_SEASON = _config.get("project", {}).get("current_season", 2025)
 
 # Create dirs if they don't exist (Safety)
-for d in [DATA_RAW_DIR, DATA_PROCESSED_DIR, MODELS_DIR, REPORTS_DIR, VIZ_DIR]:
+for d in [DATA_BRONZE_DIR, DATA_SILVER_DIR, DATA_GOLD_DIR, DATA_DUCKDB_DIR, MODELS_DIR, REPORTS_DIR, VIZ_DIR]:
     d.mkdir(parents=True, exist_ok=True)
+

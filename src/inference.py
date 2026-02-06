@@ -15,17 +15,26 @@ class InferenceEngine:
         self.model_dir = Path(model_dir)
 
     def get_latest_model(self):
-        # Search local and fallback tmp/models
-        search_paths = [self.model_dir, Path("/tmp/models")]
-        models = []
-        for path in search_paths:
-            if path.exists():
-                models.extend(list(path.glob("xgboost_risk_model_*.pkl")))
+        from src.ml_governance import MLGovernance
+        governance = MLGovernance()
+        prod_info = governance.get_production_model_info()
         
-        if not models:
+        if not prod_info:
+            logger.warning("No PRODUCTION model found in registry.")
             return None
-        latest_model = max(models, key=os.path.getctime)
-        return joblib.load(latest_model)
+            
+        model_path = Path(prod_info["path"])
+        if not model_path.exists():
+            # Fallback for transient environments
+            alt_path = Path("/tmp") / model_path.relative_to(model_path.parents[1])
+            if alt_path.exists():
+                model_path = alt_path
+            else:
+                logger.error(f"Production model file not found: {model_path}")
+                return None
+        
+        logger.info(f"Loading PRODUCTION model: {model_path}")
+        return joblib.load(model_path)
 
     def enrich_gold_layer(self):
         """
@@ -42,21 +51,19 @@ class InferenceEngine:
         # Prepare features for inference
         skip_cols = ['player_name', 'year', 'experience_years', 'edce_risk', 'fair_market_value', 'ied_overpayment', 'value_metric_proxy', 'team']
         X = df_features.drop(columns=[c for c in skip_cols if c in df_features.columns])
-        # Predict Risk
-        meta_path = self.model_dir / "feature_names.json"
-        if not meta_path.exists():
-            meta_path = Path("/tmp/models/feature_names.json")
-            
-        if meta_path.exists():
-            import json
-            with open(meta_path, 'r') as f:
-                expected_features = json.load(f)
+        
+        from src.ml_governance import MLGovernance
+        governance = MLGovernance(self.db_path) # Path is ignored but needed for init
+        prod_info = governance.get_production_model_info()
+        
+        if prod_info:
+            expected_features = prod_info.get("feature_names")
         else:
-            logger.warning("Feature names JSON not found. Using booster fallback.")
+            logger.warning("No production metadata found. Using booster fallback.")
             expected_features = model.get_booster().feature_names
             
         if expected_features is None:
-             logger.warning("Feature names not found in model metadata. Falling back to input features.")
+             logger.warning("Feature names not found. Falling back to input features.")
              expected_features = X.columns
              
         logger.info(f"ML Inference: Expected {len(expected_features)} features")
@@ -66,12 +73,12 @@ class InferenceEngine:
         
         # FINAL ENSURE: DROP ANY COLUMN NOT IN BOOSTER IF POSSIBLE
         # XGBoost is very picky about column order and count
-        df_features['ml_risk_score'] = model.predict(X_aligned)
+        new_cols = pd.DataFrame({
+            'ml_risk_score': model.predict(X_aligned),
+            'ml_fair_market_value': df_features['fair_market_value'] * (1.0 - pd.Series(model.predict(X_aligned), index=df_features.index).clip(0, 1) * 0.5)
+        }, index=df_features.index)
         
-        # Heuristic 2.0: ML-Adjusted Fair Market Value
-        # We use a base multiplier on the ML risk to adjust the heuristic FMV
-        # If risk is high, FMV should drop more steeply than static linear logic
-        df_features['ml_fair_market_value'] = df_features['fair_market_value'] * (1.0 - df_features['ml_risk_score'].clip(0, 1) * 0.5)
+        df_features = pd.concat([df_features, new_cols], axis=1)
 
         # Persistence
         con = duckdb.connect(self.db_path)
@@ -99,7 +106,8 @@ class InferenceEngine:
         con.close()
 
 if __name__ == "__main__":
-    import os
-    db_path = os.getenv("DB_PATH", "data/nfl_data.db")
+    from src.config_loader import get_db_path
+    db_path = get_db_path()
     engine = InferenceEngine(db_path)
     engine.enrich_gold_layer()
+
