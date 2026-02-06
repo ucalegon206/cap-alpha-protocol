@@ -10,6 +10,10 @@ venv/
 # Logs
 *.log
 dbt/logs/
+airflow/logs/
+airflow/*.db*
+airflow/*.cfg
+airflow/*.json
 
 # Data
 data/

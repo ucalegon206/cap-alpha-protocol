@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cap Alpha: Dynasty Vision</title>
+    <style>
+        :root {
+            --bg-deep: #0f172a;
+            --glass: rgba(30, 41, 59, 0.7);
+            --accent-gold: #fbbf24;
+            --risk-high: #ef4444;
+            --risk-low: #10b981;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+        }
+
+        .status-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--risk-low);
+            padding: 0.5rem 1rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .card {
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border-radius: 24px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            border-color: rgba(251, 191, 36, 0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .team {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .metric-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+
+        .risk-meter {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            margin-top: 2rem;
+            position: relative;
+        }
+
+        .risk-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 1s ease-out;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 4rem 0;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            font-weight: 900;
+            margin: 0;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 1.5rem auto;
+        }
+
+        /* Interactive Filters */
+        .filter-bar {
+            background: var(--glass);
+            padding: 1rem 2rem;
+            border-radius: 16px;
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .filter-btn.active {
+            color: var(--accent-gold);
+        }
+
+        footer {
+            margin-top: 10rem;
+            padding: 4rem 0;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">Cap Alpha // Strategic</div>
+            <div class="status-badge">ML Core v2.4 Status: Operational</div>
+        </header>
+
+        <section class="hero">
+            <h1>Dynasty Vision</h1>
+            <p>Intelligence-led market analysis for the modern NFL front office. Predicting alpha, exposing risk.</p>
+        </section>
+
+        <div class="filter-bar">
+            <strong>Sort By:</strong>
+            <button class="filter-btn active">High Risk</button>
+            <button class="filter-btn">Max ROI</button>
+            <button class="filter-btn">Availability</button>
+        </div>
+
+        <div id="dashboard-grid" class="grid">
+            <!-- Cards will be injected here -->
+            <div class="card">
+                <div class="player-header">
+                    <div>
+                        <p class="team">SEA // ILB</p>
+                        <h3 class="name">Patrick O'Connell</h3>
+                    </div>
+                    <div class="status-badge"
+                        style="background: rgba(239, 68, 68, 0.1); color: var(--risk-high); border-color: rgba(239, 68, 68, 0.2);">
+                        High Risk</div>
+                </div>
+                <div class="metric-group">
+                    <div class="metric">
+                        <span class="metric-label">Cap Hit</span>
+                        <span class="metric-value">$0.34M</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">ML Fair Value</span>
+                        <span class="metric-value">$0.28M</span>
+                    </div>
+                </div>
+                <div class="risk-meter">
+                    <div class="risk-fill" style="width: 82%; background: var(--risk-high);"></div>
+                </div>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 1rem;">ML Risk Score: 0.821 //
+                    High Position Drift Detected</p>
+            </div>
+        </div>
+
+        <footer>
+            &copy; 2026 Smith Strategic Operations. Sacrosanct Pipeline v2.
+        </footer>
+    </div>
+
+    <script>
+        // Placeholder for data fetching
+        async function loadData() {
+            try {
+                const response = await fetch('data/latest_audit.json');
+                const data = await response.json();
+                renderCards(data.players);
+            } catch (e) {
+                console.warn("Could not load latest_audit.json. Using sample data.");
+            }
+        }
+
+        function renderCards(players) {
+            const grid = document.getElementById('dashboard-grid');
+            // Logic to render players...
+        }
+
+        loadData();
+    </script>
+</body>
+
+</html>

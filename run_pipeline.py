@@ -67,8 +67,11 @@ def main():
     if not args.skip_audits:
         logger.info("--- Starting Step: Strategic Audits ---")
         try:
-            engine = StrategicEngine("data/nfl_belichick.db")
-            engine.generate_audit_report("reports/nfl_team_strategic_audit_2025.md", year=2025)
+            import os
+            db_path = os.getenv("DB_PATH", "data/nfl_belichick.db")
+            engine = StrategicEngine(db_path)
+            report_path = os.getenv("AUDIT_REPORT_PATH", "reports/nfl_team_strategic_audit_2025.md")
+            engine.generate_audit_report(report_path, year=2025)
             engine.close()
             logger.info("--- Completed Step: Strategic Audits ---")
         except Exception as e:

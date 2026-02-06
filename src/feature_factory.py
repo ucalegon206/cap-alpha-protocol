@@ -8,7 +8,8 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_belichick.db"
+import os
+DB_PATH = os.getenv("DB_PATH", "data/nfl_data.db")
 
 class FeatureFactory:
     def __init__(self, db_path=DB_PATH):
@@ -23,7 +24,7 @@ class FeatureFactory:
         
         # 2. Clean Numeric Fields
         if 'experience_years' in df.columns:
-            df['experience_years_num'] = df['experience_years'].str.extract(r'(\d+)').astype(float).fillna(0)
+            df['experience_years_num'] = df['experience_years'].astype(str).str.extract(r'(\d+)').astype(float).fillna(0)
             
         # 3. Categorical Expansion (One-Hot Encoding)
         # We preserve the original 'team' for metadata persistence in prediction_results

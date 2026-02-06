@@ -15,17 +15,27 @@ from src.financial_ingestion import load_team_financials, load_player_merch
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_belichick.db"
+DB_PATH = os.getenv("DB_PATH", "data/nfl_data.db")
 RAW_DIR = Path("data/raw")
 
 def clean_doubled_name(name):
     if not isinstance(name, str): return name
+    # Case 1: "Peterson Patrick Peterson" (Last First Last)
     parts = name.strip().split()
-    if len(parts) < 2: return name
-    # Case 1: "Peterson Patrick Peterson"
     if len(parts) >= 3 and parts[0] == parts[-1]:
         return " ".join(parts[1:])
-    # Case 2: "Patrick Peterson Patrick Peterson"
+
+    # Case 2: No spaces "Kyler MurrayKyler Murray"
+    mid_idx = len(name) // 2
+    if len(name) % 2 == 0:
+        first_half = name[:mid_idx]
+        second_half = name[mid_idx:]
+        if first_half == second_half:
+            return first_half
+
+    # Case 3: "Patrick Peterson Patrick Peterson"
+    parts = name.strip().split()
+    if len(parts) < 2: return name
     mid = len(parts) // 2
     if len(parts) % 2 == 0:
         if parts[:mid] == parts[mid:]:
@@ -44,27 +54,22 @@ def find_targeted_files(pattern_name: str, year: int, week: int = None):
         raise ValueError("Year parameter is required for explicit ingestion.")
         
     year_dir = RAW_DIR / str(year)
+    
+    # Legacy Fallback (Top-level files) for historical backfills or manual imports
+    if not year_dir.exists() or week is None:
+        legacy = list(RAW_DIR.glob(f"{pattern_name}_{year}_*.csv"))
+        if legacy:
+            # Sort by timestamp in filename if present
+             legacy.sort()
+             logger.info(f"Using legacy file for {pattern_name} ({year}): {legacy[-1]}")
+             return [legacy[-1]]
+             
     if not year_dir.exists():
-        logger.warning(f"Year directory {year_dir} does not exist.")
+        logger.warning(f"Year directory {year_dir} does not exist and no legacy files found.")
         return []
 
-    # If week is specified, look for week_{week}_*
-    # If week is NOT specified, we fall back to "latest available for that year" 
-    # BUT properly we should demand explicit inputs. 
-    # For now, to support the user's "single pipeline" flow where week might be implicit if running locally without it,
-    # we'll look for the latest run of that year IF week is missing.
-    # But strictly, the DAG passes both.
-    
     target_pattern = f"week_{week}_*" if week else "*"
     subdirs = sorted([d for d in year_dir.glob(target_pattern) if d.is_dir()])
-    
-    if not subdirs:
-        logger.warning(f"No data found for Year={year}, Week={week}")
-        # Check for legacy flat files if week is None
-        if week is None:
-             legacy = list(RAW_DIR.glob(f"{pattern_name}_{year}_*.csv"))
-             return [legacy[-1]] if legacy else []
-        return []
 
     # If multiple timestamps for same week, take latest (Repair/Resync logic)
     target_dir = subdirs[-1]
@@ -91,7 +96,8 @@ def ingest_spotrac(year: int, week: int):
     # UPSERT Logic: Contracts
     con.execute("CREATE TABLE IF NOT EXISTS silver_spotrac_contracts AS SELECT * FROM df LIMIT 0")
     con.execute(f"DELETE FROM silver_spotrac_contracts WHERE year = {year}")
-    con.execute("INSERT INTO silver_spotrac_contracts BY NAME SELECT * FROM df")
+    # Enforce uniqueness at ingestion to prevent row explosion
+    con.execute("INSERT INTO silver_spotrac_contracts BY NAME SELECT DISTINCT * FROM df")
     count = con.execute(f"SELECT COUNT(*) FROM silver_spotrac_contracts WHERE year = {year}").fetchone()[0]
     logger.info(f"✓ Upserted {count} rows into silver_spotrac_contracts for {year}")
 
@@ -105,14 +111,21 @@ def ingest_spotrac(year: int, week: int):
         con.execute("CREATE TABLE IF NOT EXISTS silver_spotrac_salaries AS SELECT * FROM df_sal LIMIT 0")
         con.execute(f"DELETE FROM silver_spotrac_salaries WHERE year = {year}")
         try:
-             con.execute("INSERT INTO silver_spotrac_salaries SELECT * FROM df_sal")
-        except duckdb.ConstraintException:
-             # Handle schema skew if strict
-             logger.warning("Schema mismatch in salaries, falling back to loose insert")
-             # Flatten Columns logic if needed, but for now assume schema compatibility or use by-name
              con.execute("INSERT INTO silver_spotrac_salaries BY NAME SELECT * FROM df_sal")
-             
+        except Exception as e:
+             logger.warning(f"Schema mismatch in salaries: {e}")
         logger.info(f"✓ Upserted rows into silver_spotrac_salaries for {year}")
+    else:
+        # Hardened Schema Provisioning: Ensure table exists for gold layer join
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS silver_spotrac_salaries (
+                player_name VARCHAR,
+                team VARCHAR,
+                year INTEGER,
+                "dead cap" VARCHAR
+            )
+        """)
+        logger.info("✓ Provisioned baseline silver_spotrac_salaries schema (Empty).")
 
     # Rankings
     rank_files = find_targeted_files("spotrac_player_rankings", year, week)
@@ -132,10 +145,12 @@ def ingest_pfr(year: int, week: int):
     con = duckdb.connect(DB_PATH)
     logger.info(f"Ingesting PFR (Year={year}, Week={week}) - Upsert Mode")
     
-    files = find_targeted_files("game_logs", year, week)
+    files = find_targeted_files("pfr_game_logs", year, week)
     if not files:
-        # Retry with prefix prefix
-        files = find_targeted_files("pfr_game_logs", year, week)
+        # PFR legacy files are often named 'game_logs_{year}.csv'
+        # Search recursively in data/raw
+        files = list(RAW_DIR.rglob(f"game_logs_{year}.csv"))
+        if files: logger.info(f"Using legacy PFR file: {files[0]}")
         
     if not files:
         logger.warning("Skipping PFR ingest: No file found.")
@@ -146,10 +161,18 @@ def ingest_pfr(year: int, week: int):
     pfr_col = 'Unnamed: 0_level_0_Player' if 'Unnamed: 0_level_0_Player' in df.columns else 'Player'
     if pfr_col in df.columns:
         df = df.rename(columns={pfr_col: 'player_name'})
+        df = df.dropna(subset=['player_name'])
         df['player_name'] = df['player_name'].str.replace('*', '', regex=False).str.replace('+', '', regex=False).str.strip()
+    
+    # Standardize Team column
+    tm_col = 'Unnamed: 1_level_0_Tm' if 'Unnamed: 1_level_0_Tm' in df.columns else 'Tm'
+    if tm_col in df.columns:
+        df = df.rename(columns={tm_col: 'team'})
     
     # UPSERT Logic
     con.execute("CREATE TABLE IF NOT EXISTS silver_pfr_game_logs AS SELECT * FROM df LIMIT 0")
+    # Ensure team column exists for older table versions
+    con.execute("ALTER TABLE silver_pfr_game_logs ADD COLUMN IF NOT EXISTS team VARCHAR")
     con.execute(f"DELETE FROM silver_pfr_game_logs WHERE year = {year}")
     con.execute("INSERT INTO silver_pfr_game_logs BY NAME SELECT * FROM df")
     logger.info(f"✓ Upserted rows into silver_pfr_game_logs for {year}")
@@ -192,9 +215,37 @@ def ingest_penalties(year: int):
     df['team'] = df['team_city'].map(city_map)
     
     con.execute("CREATE TABLE IF NOT EXISTS silver_penalties AS SELECT * FROM df LIMIT 0")
+    # Schema evolution: Ensure all columns in DF exist in table
+    existing_cols = con.execute("PRAGMA table_info('silver_penalties')").df()['name'].tolist()
+    for col in df.columns:
+        if col not in existing_cols:
+            logger.info(f"Adding missing column {col} to silver_penalties")
+            # Quote column name to support spaces (e.g., 'Total Flags')
+            con.execute(f'ALTER TABLE silver_penalties ADD COLUMN "{col}" VARCHAR')
     con.execute(f"DELETE FROM silver_penalties WHERE year = {year}")
     con.execute("INSERT INTO silver_penalties BY NAME SELECT * FROM df")
     logger.info(f"✓ Upserted rows into silver_penalties for {year}")
+    con.close()
+
+def ingest_team_cap():
+    con = duckdb.connect(DB_PATH)
+    logger.info("Ingesting Team Cap & Record data (Historical)...")
+    files = list(Path("data_raw/dead_money").glob("team_cap_*.csv"))
+    if not files:
+        logger.warning("No team cap files found in data_raw/dead_money")
+        con.close()
+        return
+        
+    # Combine all years
+    dfs = []
+    for f in files:
+        dfs.append(pd.read_csv(f))
+    
+    if dfs:
+        df = pd.concat(dfs)
+        con.execute("CREATE OR REPLACE TABLE silver_team_cap AS SELECT * FROM df")
+        logger.info(f"✓ Loaded {len(df)} team-year records into silver_team_cap")
+    
     con.close()
 
 def create_gold_layer():
@@ -210,6 +261,19 @@ def create_gold_layer():
     else:
         logger.warning("No draft history file found at data/raw/pfr/draft_history.csv")
 
+    # Hardened Metadata Provisioning
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS silver_player_metadata (
+            full_name VARCHAR,
+            birth_date VARCHAR,
+            college VARCHAR,
+            draft_round INTEGER,
+            draft_pick INTEGER,
+            experience_years INTEGER
+        )
+    """)
+    logger.info("✓ Provisioned baseline silver_player_metadata schema (Empty).")
+
     logger.info("Building Gold Layer: fact_player_efficiency...")
     
     con.execute("""
@@ -217,14 +281,15 @@ def create_gold_layer():
     WITH pfr_agg AS (
         SELECT 
             player_name,
+            team,
             year,
-            COUNT(*) as games_played,
+            COUNT(DISTINCT game_url) as games_played,
             SUM(TRY_CAST(Passing_Yds AS FLOAT)) as total_pass_yds,
             SUM(TRY_CAST(Rushing_Yds AS FLOAT)) as total_rush_yds,
             SUM(TRY_CAST(Receiving_Yds AS FLOAT)) as total_rec_yds,
             SUM(TRY_CAST(Passing_TD AS INT) + TRY_CAST(Rushing_TD AS INT) + TRY_CAST(Receiving_TD AS INT)) as total_tds
         FROM silver_pfr_game_logs
-        GROUP BY 1, 2
+        GROUP BY 1, 2, 3
     ),
     penalties_agg AS (
         SELECT 
@@ -241,17 +306,17 @@ def create_gold_layer():
                 THEN SUBSTRING(s.player_name, 1, CAST(LENGTH(s.player_name)/2 AS BIGINT))
                 ELSE s.player_name 
             END as player_name, 
-            s.team, s.year, s.position,
-            MAX(COALESCE(s.cap_hit_millions, r.ranking_cap_hit_millions)) as cap_hit_millions,
-            MAX(s.dead_cap_millions) as dead_cap_millions,
+            s.team, s.year, 
+            MAX(s.position) as position,
+            SUM(COALESCE(s.cap_hit_millions, r.ranking_cap_hit_millions)) as cap_hit_millions,
+            SUM(s.dead_cap_millions) as dead_cap_millions,
             MAX(s.signing_bonus_millions) as signing_bonus_millions,
-            MAX(s.guaranteed_money_millions) as guaranteed_money_millions,
             MAX(s.age) as age
         FROM silver_spotrac_contracts s
         LEFT JOIN silver_spotrac_rankings r 
           ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(r.player_name AS VARCHAR)))
           AND s.year = r.year
-        GROUP BY 1, 2, 3, 4
+        GROUP BY 1, 2, 3
     ),
     salary_dead_cap AS (
         SELECT 
@@ -306,12 +371,14 @@ def create_gold_layer():
         SELECT 
             s.*,
             COALESCE(p.games_played, 0) as games_played,
+            CAST(COALESCE(p.games_played, 0) AS FLOAT) / 17.0 as availability_rating,
             COALESCE(p.total_pass_yds, 0) as total_pass_yds,
             COALESCE(p.total_rush_yds, 0) as total_rush_yds,
             COALESCE(p.total_rec_yds, 0) as total_rec_yds,
             COALESCE(p.total_tds, 0) as total_tds,
             af.corrected_age as age_final,
             af.college, af.draft_round, af.draft_pick, af.experience_years,
+            (s.cap_hit_millions * 1.08) as future_cap_projection_2026,
             
             -- Penalties
             COALESCE(pen.total_penalty_count, 0) as total_penalty_count,
@@ -323,7 +390,8 @@ def create_gold_layer():
             tc.Revenue_M as team_revenue,
             tc.OperatingIncome_M as team_op_income
         FROM dedup_contracts s
-        LEFT JOIN pfr_agg p ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(p.player_name AS VARCHAR))) AND s.year = p.year
+        LEFT JOIN pfr_agg p ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(p.player_name AS VARCHAR))) 
+            AND s.year = p.year AND s.team = p.team
         -- Fuzzy join for penalties (Short name L.Tunsil starts with first letter + contains last name)
         LEFT JOIN penalties_agg pen ON s.year = pen.year AND s.team = pen.team
             AND (LOWER(s.player_name) LIKE LOWER(LEFT(pen.player_name_short, 1)) || '%' AND LOWER(s.player_name) LIKE '%' || LOWER(SUBSTRING(pen.player_name_short, 3)))
@@ -332,14 +400,17 @@ def create_gold_layer():
             SELECT Player, MIN(Rank) as Rank, MAX(51 - Rank) as popularity_score FROM silver_player_merch GROUP BY 1
         ) pm ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(pm.Player AS VARCHAR)))
         LEFT JOIN silver_team_finance tc ON LOWER(TRIM(CAST(s.team AS VARCHAR))) = LOWER(TRIM(CAST(tc.Team AS VARCHAR))) AND tc.Year = 2023
+        LEFT JOIN silver_team_cap stc ON s.team = stc.team AND s.year = stc.year
     )
     SELECT 
         f.player_name, f.team, f.position, f.year, f.cap_hit_millions,
-        GREATEST(COALESCE(sdc.salaries_dead_cap_millions, 0), f.dead_cap_millions, COALESCE(f.signing_bonus_millions, 0) * 2.0, COALESCE(f.guaranteed_money_millions, 0)) as potential_dead_cap_millions,
+        GREATEST(COALESCE(sdc.salaries_dead_cap_millions, 0), f.dead_cap_millions, COALESCE(f.signing_bonus_millions, 0) * 2.0) as potential_dead_cap_millions,
         f.age_final as age,
         f.college, f.draft_round, f.draft_pick, f.experience_years,
-        f.games_played, f.total_pass_yds, f.total_rush_yds, f.total_rec_yds, f.total_tds,
+        f.games_played, f.availability_rating, f.total_pass_yds, f.total_rush_yds, f.total_rec_yds, f.total_tds,
         f.total_penalty_count, f.total_penalty_yards,
+        COALESCE(stc.win_pct, 0.500) as win_pct,
+        f.future_cap_projection_2026,
         
         -- Efficiency Logic (Now including penalties as a negative weight)
         ( (COALESCE(f.total_tds,0) * 2.0 + (COALESCE(f.total_pass_yds,0) + COALESCE(f.total_rush_yds,0) + COALESCE(f.total_rec_yds,0)) / 100.0) * 1.8 
@@ -364,11 +435,13 @@ def create_gold_layer():
         f.team_op_income,
         
         -- Combined Efficiency Score (Football ROI + Financial ROI)
-        ( ( (COALESCE(f.total_tds,0) * 6 + (COALESCE(f.total_pass_yds,0) + COALESCE(f.total_rush_yds,0) + COALESCE(f.total_rec_yds,0)) / 20.0) / NULLIF(f.cap_hit_millions, 0) ) + ( ( (f.popularity_score * 0.2) + (CASE WHEN f.merch_rank <= 10 THEN 5.0 WHEN f.merch_rank <= 50 THEN 2.0 ELSE 0 END) ) / NULLIF(f.cap_hit_millions, 0) ) ) as combined_roi_score
+        ( ( (COALESCE(f.total_tds,0) * 6 + (COALESCE(f.total_pass_yds,0) + COALESCE(f.total_rush_yds,0) + COALESCE(f.total_rec_yds,0)) / 20.0) / NULLIF(f.cap_hit_millions, 0) ) + ( ( (f.popularity_score * 0.2) + (CASE WHEN f.merch_rank <= 10 THEN 5.0 WHEN f.merch_rank <= 50 THEN 2.0 ELSE 0 END) ) / NULLIF(f.cap_hit_millions, 0) ) ) as combined_roi_score,
+        ( ( (COALESCE(f.total_tds,0) * 6 + (COALESCE(f.total_pass_yds,0) + COALESCE(f.total_rush_yds,0) + COALESCE(f.total_rec_yds,0)) / 20.0) / NULLIF(f.cap_hit_millions, 0) )) as cap_roi_score
         
     FROM fact_long_fallback f
     LEFT JOIN age_risk_theshold ar ON f.player_name = ar.player_name AND f.year = ar.year
     LEFT JOIN salary_dead_cap sdc ON LOWER(TRIM(CAST(f.player_name AS VARCHAR))) = LOWER(TRIM(CAST(sdc.player_name AS VARCHAR))) AND f.year = sdc.year AND LOWER(TRIM(CAST(f.team AS VARCHAR))) = LOWER(TRIM(CAST(sdc.team AS VARCHAR)))
+    LEFT JOIN silver_team_cap stc ON f.team = stc.team AND f.year = stc.year
     """)
     
     logger.info("✓ Gold Layer created: fact_player_efficiency (Penalty-Aware)")
@@ -385,4 +458,14 @@ if __name__ == "__main__":
     ingest_pfr(year=args.year, week=args.week)
     ingest_penalties(year=args.year)
     ingest_financials()
+    ingest_team_cap()
     create_gold_layer()
+    
+    # NEW: Phase 2 Strategic Upgrade (ML Enrichment)
+    try:
+        from src.inference import InferenceEngine
+        # Provide both paths explicitly if needed, but the engine now searches fallback /tmp/models
+        engine = InferenceEngine(DB_PATH, model_dir="/tmp/models")
+        engine.enrich_gold_layer()
+    except Exception as e:
+        logger.warning(f"ML Enrichment failed: {e}. Falling back to heuristic baseline.")

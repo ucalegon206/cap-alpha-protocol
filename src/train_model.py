@@ -13,9 +13,10 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_belichick.db"
-MODEL_DIR = Path("models")
-MODEL_DIR.mkdir(exist_ok=True)
+import os
+DB_PATH = os.getenv("DB_PATH", "data/nfl_data.db")
+MODEL_DIR = Path("/tmp/models")
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 class RiskModeler:
     def __init__(self, db_path=DB_PATH):
@@ -76,8 +77,9 @@ class RiskModeler:
         plt.figure(figsize=(10, 6))
         shap.summary_plot(shap_values, X_test, show=False)
         plt.tight_layout()
-        plt.savefig("reports/shap_summary.png", dpi=300, bbox_inches='tight')
-        logger.info("✓ SHAP summary plot saved to reports/shap_summary.png")
+        report_path = os.getenv("REPORT_PATH", "reports/shap_summary.png")
+        plt.savefig(report_path, dpi=300, bbox_inches='tight')
+        logger.info(f"✓ SHAP summary plot saved to {report_path}")
         
         return shap_values
 
@@ -101,16 +103,20 @@ class RiskModeler:
         logger.info(f"✓ Model artifact saved to: {model_path}")
         
         # 3. Save Model Metadata (MLE Skill)
+        feature_names = list(X.columns)
+        with open(MODEL_DIR / "feature_names.json", "w") as f:
+            json.dump(feature_names, f)
+            
         meta = {
             "training_timestamp": timestamp,
-            "feature_count": X.shape[1],
-            "feature_names": list(X.columns),
+            "feature_count": len(feature_names),
+            "feature_names": feature_names,
             "model_params": model.get_params(),
-            "metrics": "See logs (RMSE/R2)" # In a real system, pass these in
+            "metrics": "See logs (RMSE/R2)"
         }
         with open(MODEL_DIR / f"model_meta_{timestamp}.json", "w") as f:
             json.dump(meta, f, indent=2)
-        logger.info("✓ Model metadata saved.")
+        logger.info("✓ Model metadata and feature names saved.")
 
 if __name__ == "__main__":
     modeler = RiskModeler()

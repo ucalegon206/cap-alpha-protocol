@@ -1,8 +1,12 @@
-
 import unittest
-from airflow.models import DagBag
+try:
+    from airflow.models import DagBag
+    HAS_AIRFLOW = True
+except ImportError:
+    HAS_AIRFLOW = False
 from pathlib import Path
 
+@unittest.skipIf(not HAS_AIRFLOW, "Airflow not installed")
 class TestDagIntegrity(unittest.TestCase):
     def setUp(self):
         self.dagbag = DagBag(dag_folder=str(Path(__file__).parents[1] / 'dags'), include_examples=False)

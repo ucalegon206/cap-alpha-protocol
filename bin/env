@@ -1,0 +1,26 @@
+#!/bin/bash
+# Cap Alpha Protocol: Sacrosanct Runtime Activator
+# Usage: source bin/env
+
+SACROSANCT_ENV="/tmp/nfl_production_env"
+
+if [ ! -d "$SACROSANCT_ENV" ]; then
+    echo "❌ Sacrosanct Runtime not found in $SACROSANCT_ENV"
+    echo "Please run 'make setup' first."
+    return 1 2>/dev/null || exit 1
+fi
+
+# Export paths to prioritize sacrosanct binaries
+export PATH="$SACROSANCT_ENV/bin:$PATH"
+export VIRTUAL_ENV="$SACROSANCT_ENV"
+export PYTHONPATH=".:$PYTHONPATH"
+export PYTHONDONTWRITEBYTECODE=1
+
+# Alias python and pytest to ensure they use the correct environment
+alias python="$SACROSANCT_ENV/bin/python"
+alias pytest="$SACROSANCT_ENV/bin/pytest"
+alias pip="$SACROSANCT_ENV/bin/pip"
+
+echo "🦅 [Cap Alpha] Sacrosanct Runtime Activated."
+echo "Python: $(python --version)"
+echo "DuckDB: $(pip show duckdb | grep Version || echo 'Missing!')"

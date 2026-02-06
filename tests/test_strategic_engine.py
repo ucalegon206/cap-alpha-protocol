@@ -1,12 +1,14 @@
 
 import pytest
 import pandas as pd
+import os
 from unittest.mock import MagicMock
 from src.strategic_engine import StrategicEngine
 
 @pytest.fixture
 def engine():
-    return StrategicEngine("data/nfl_belichick.db")
+    db_path = os.getenv("DB_PATH", "data/nfl_data.db")
+    return StrategicEngine(db_path)
 
 def test_prescribe_emergency_purge(engine):
     row = pd.Series({
