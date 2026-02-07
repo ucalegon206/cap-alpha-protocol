@@ -626,6 +626,26 @@
         "sensor_leadership_friction_24"
       ],
       "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260206_122046.pkl",
+      "timestamp": "2026-02-06T12:20:46.434971",
+      "git_sha": "b4f7701e3a42b5470e11da376b0b7e2089b9d73f",
+      "metrics": {
+        "rmse": 0.997547800034988,
+        "r2": 0.2811730597327964
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
     }
   ],
   "history": []

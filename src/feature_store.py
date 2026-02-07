@@ -220,7 +220,8 @@ class FeatureStore:
     def get_training_matrix(self, as_of_date: date, 
                             min_year: int = 2015) -> pd.DataFrame:
         """
-        Get feature matrix for training with strict point-in-time semantics.
+        Get feature matrix for training with strict point-in-time semantics as of a SINGLE date.
+        Useful for Inference or specific backtest folds.
         
         Args:
             as_of_date: The 'knowledge cutoff' date. We only use data valid on or before this date.
@@ -278,6 +279,68 @@ class FeatureStore:
         pivot_df.columns = [col if isinstance(col, str) else col for col in pivot_df.columns]
         
         logger.info(f"✓ Retrieved {len(pivot_df):,} rows × {len(pivot_df.columns)} features")
+        return pivot_df
+
+    def get_historical_features(self, min_year: int = 2015, max_year: int = 2025) -> pd.DataFrame:
+        """
+        Get feature matrix for Batch Training (Diagonal Join).
+        
+        Reconstructs what was known at the start of EACH season (Sept 1st) for that season.
+        Unlike get_training_matrix (which uses one as_of_date), this uses a dynamic
+        as_of_date = make_date(prediction_year, 9, 1).
+        
+        Args:
+            min_year: Start year
+            max_year: End year
+        """
+        logger.info(f"Retrieving historical features (Diagonal Join {min_year}-{max_year})...")
+        
+        query = f"""
+            WITH base AS (
+                SELECT DISTINCT player_name, year 
+                FROM fact_player_efficiency 
+                WHERE year BETWEEN {min_year} AND {max_year}
+            ),
+            pit_features AS (
+                SELECT 
+                    fv.player_name,
+                    fv.prediction_year,
+                    fv.feature_name,
+                    fv.feature_value
+                FROM feature_values fv
+                WHERE fv.prediction_year BETWEEN {min_year} AND {max_year}
+                  -- DIAGONAL JOIN LOGIC:
+                  -- Valid at the start of the prediction season (Sept 1st)
+                  AND fv.valid_from <= make_date(fv.prediction_year, 9, 1)
+                  AND (fv.valid_until > make_date(fv.prediction_year, 9, 1) OR fv.valid_until IS NULL)
+            )
+            SELECT 
+                b.player_name,
+                b.year,
+                pf.feature_name,
+                pf.feature_value
+            FROM base b
+            LEFT JOIN pit_features pf
+                ON b.player_name = pf.player_name
+                AND b.year = pf.prediction_year
+        """
+        
+        df = self.con.execute(query).df()
+        
+        if df.empty:
+            logger.warning("No features found.")
+            return df
+            
+        pivot_df = df.pivot_table(
+            index=['player_name', 'year'], 
+            columns='feature_name', 
+            values='feature_value',
+            aggfunc='first'
+        ).reset_index()
+        
+        pivot_df.columns = [col if isinstance(col, str) else col for col in pivot_df.columns]
+        
+        logger.info(f"✓ Retrieved {len(pivot_df):,} rows (Historical Batch)")
         return pivot_df
         
     def validate_temporal_integrity(self) -> bool:

@@ -1,85 +1,64 @@
-# 🏈 Cap Alpha Protocol: Strategic Intelligence Engine
- 
-**System Version**: 2.1 (Production Hardened)  
-**Last Updated**: Feb 2026
+# NFL Dead Money: Cap Alpha Protocol
 
-## 1. System Overview
-The **Cap Alpha Protocol** is a hyperscale intelligence system designed to quantify "Liquidity Drag" (formerly Dead Money) and prescribe strategic actions for NFL front offices. It ingests financial data (Spotrac) and performance metrics (PFR), models the probability of "Capital Inefficiency" utilizing XGBoost, and generates automated strategic audits.
+**Strategic Intelligence Engine for NFL Roster Asset Management**
 
-### Key Capabilities
-- **Risk Frontier Modeling**: Predicts the 24-month probability of a contract becoming "Toxic" (Dead Money > Performance Value).
-- **Strategic Engine**: Prescribes specific actions (e.g., "Emergency Purge", "Draft Priority: QB") based on roster risk and depth context.
-- **Hyperscale Feature Matrix**: Generates 1000+ features including performance lag, volatility, and salary cap inflation adjustments.
+> **Status**: Production (v2.0)
+> **Architecture**: Medallion (DuckDB) | Date-Based Feature Store
+> **Performance**: R2 = **0.91** (High Cap >$10M) | R2 = 0.51 (Mid Cap) | R2 = 0.03 (Low Cap)
 
----
+## Overview
+This system is an **Agentic Decision Support System** designed to identify inefficiencies in the NFL salary market. It ingests 15 years of contract and performance data (2011-2025), reconstructs the state of the world at any historical point in time, and predicts "Efficiency-Adjusted Cap Risk" (EDCE Risk).
 
-## 2. Architecture & Data Flow
+The engine is built on two core principles:
+1.  **Point-in-Time Correctness**: A strict Date-Based Feature Store (`valid_from`, `valid_until`) eliminates temporal leakage.
+2.  **High-Cap Focus**: The model is optimized for "Dynasty Assets" (Starters/Stars), where signal is high (R2=0.91), ignoring the noise of the "Churn" (Low Cap <$2M).
 
-### Layer 1: Ingestion (Raw -> Silver)
-- **Scrapers**:
-    - `src/spotrac_scraper_v2.py`: Fetches Cap Hit, Dead Cap, and Contract Terms. Handles scalar ambiguity.
-    - `src/pfr_game_logs.py`: Fetches game-level stats with exponential backoff for 429 rate-limiting.
-    - `src/pfr_draft_scraper.py`: Fetches recent draft history (2023-2025) for context.
-- **Storage**: Raw CSVs stored in `data/raw/` (Versioned by timestamp).
-- **Normalization**: `scripts/ingest_to_duckdb.py` cleans and loads data into **DuckDB** (`silver_` tables).
+## Key Components
 
-### Layer 2: Feature Engineering (Silver -> Gold)
-- **Feature Factory**: `src/feature_factory.py` transforms raw stats into predictive signals.
-    - **Lags**: `total_tds_lag_1`, `total_tds_lag_2` (Stability Metrics).
-    - **Volatility**: Rolling standard deviation of performance.
-    - **Demographics**: True Age (Birthdate), Experience, Draft Capital.
-- **Gold Table**: `fact_player_efficiency` (The "One Big Table" for modeling).
+### 1. Medallion Data Architecture (DuckDB)
+- **Bronze**: Raw HTML scrapes (Spotrac, PFR) stored as JSON/Parquet.
+- **Silver**: Cleaned, typed tables (`dim_players`, `fact_contracts`, `fact_player_efficiency`).
+- **Gold**: Feature Store (`feature_values`) and Prediction Results.
 
-### Layer 3: Predictive Modeling (XGBoost)
-- **Target**: `edce_risk` (Expected Dead Cap Exposure).
-- **Algorithm**: XGBoost Regressor (Gradient Boosting).
-- **Validation**: 5-Fold Time-Series Cross-Validation.
-- **Transparency**: SHAP (SHapley Additive exPlanations) values generated for every prediction.
+### 2. Date-Based Feature Store
+A custom-built Feature Store that manages time-travel. Unlike standard "Year-based" models, this system handles precise dates (e.g., September 1st Cutoff).
+- **Table**: `feature_values`
+- **Columns**: `player_name`, `feature_name`, `feature_value`, `details`, `valid_from` (DATE), `valid_until` (DATE).
+- **Retrieval**: `FeatureStore.get_historical_features(as_of_date)`
 
-### Layer 4: Strategic Intelligence (The "Brain")
-- **Engine**: `src/strategic_engine.py` (Centralized Logic).
-- **Prescription Logic**:
-    1. **Risk Assessment**: Classifies teams as "Emergency Purge", "Structural Rebalancing", etc.
-    2. **Context Check**:
-        - **FA Check**: Did they sign a "Big Splash" FA (>$10M APY) in 2025? -> `FA Solution`
-        - **Draft Check**: Did they draft a successor (Rd 1-3) in 2023-2025? -> `Develop Successor`
-    3. **Recommendation**: If no solution found -> `Draft Priority: [Position]`.
+### 3. XGBoost "Risk Engine"
+A Walk-Forward Validation pipeline that trains on past data to predict future inefficiencies.
+- **Target**: `edce_risk` (Efficiency Decay)
+- **Validation**: Rolling window backtest (2018-2025).
+- **Segmentation**: Explicitly segmented by Cap Bucket to isolate "Elite Signal."
 
----
+## Setup & Usage
 
-## 3. Operational Playbook
+### Prerequisites
+- macOS (Apple Silicon) / Linux
+- Python 3.10+
+- **Local Libs Strategy**: Due to environment restrictions, dependencies are installed locally in `./libs`.
 
-### Running the Pipeline
-The entire system is orchestrated via `run_pipeline.py`, which mimics a production Airflow DAG.
-
+### Quickstart
 ```bash
-# Activate Virtual Env
-source .venv/bin/activate
+# 1. Set up environment (Local Libs)
+export PYTHONPATH="$(pwd)/libs:$PYTHONPATH"
 
-# Execute End-to-End Pipeline
-python run_pipeline.py
+# 2. Materialize Features (Populate Feature Store)
+python3 scripts/materialize_features.py
+
+# 3. Train Model & Generate Predictions
+python3 src/train_model.py
+
+# 4. Audit Population Coverage
+python3 scripts/population_audit.py
 ```
 
-### Testing & Integrity
-The system includes a formal **Pytest** suite to ensure logic correctness and data integrity.
+## Results Summary (2026 Audit)
+The "Low Cap Chaos" hypothesis was confirmed. The model is highly predictive for substantial contracts but random for minimum-wage players.
 
-```bash
-# Run Unit & Integrity Tests
-python -m pytest tests/
-```
-- **Integrity**: Verifies 32 teams exist, no NULL critical fields, and successful 2025/2026 data sync.
-- **Logic**: Verifies "Successor Suppression" and "FA Splash" logic using mocks.
-
----
-
-## 4. Directory Structure
-- `src/`: Core libraries (`StrategicEngine`, `SpotracScraper`, `FeatureFactory`).
-- `scripts/`: ETL and Reporting scripts (`ingest_to_duckdb.py`, `generate_team_prescriptions.py`).
-- `tests/`: Pytest suite (`test_strategic_engine.py`, `test_data_integrity.py`).
-- `data/`: DuckDB instance (`nfl_data.db`) and raw CSVs.
-- `reports/`: Markdown audits and visualizations.
-
-## 5. Further Documentation
-- [Data Structure Guide (v2.0)](DATA_STRUCTURE_GUIDE.md) - Deep dive into Bronze/Silver/Gold DuckDB Schema.
-- [Pipeline Architecture](PIPELINE_DOCUMENTATION.md) - End-to-end orchestration flow (`run_pipeline.py`).
-- [Testing & Integrity](TESTING.md) - Guide to `pytest` suites and Triple Check gates.
+| Cap Bucket | Count | R2 Score | Strategy |
+|------------|-------|----------|----------|
+| **High Cap (>$10M)** | 39,734 | **0.91** | **Trust Implicitly** |
+| Mid Cap ($2M-$10M) | 114,424 | **0.51** | Use as Signal |
+| Low Cap (<$2M) | 332,001 | 0.03 | **Ignore** |

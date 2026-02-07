@@ -4,10 +4,15 @@ import numpy as np
 import duckdb
 import logging
 import xgboost as xgb
-import shap
+try:
+    import shap
+except ImportError:
+    shap = None
 import matplotlib.pyplot as plt
+import os
 from sklearn.metrics import mean_squared_error, r2_score
 from pathlib import Path
+from src.feature_store import FeatureStore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,14 +25,35 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 class RiskModeler:
     def __init__(self, db_path=DB_PATH):
+        self.db_path = db_path
         self.con = duckdb.connect(db_path)
 
     def prepare_data(self, target_col='edce_risk'):
-        logger.info(f"Loading feature matrix for target: {target_col}...")
-        df = self.con.execute("SELECT * FROM staging_feature_matrix").df()
+        logger.info(f"Loading feature matrix from FEATURE STORE...")
+        
+        # Initialize store
+        store = FeatureStore(db_path=self.db_path)
+        
+        # Get historical features (diagonal join)
+        # Using 2015-2025 range
+        df_features = store.get_historical_features(min_year=2015, max_year=2025)
+        
+        if df_features.empty:
+            raise ValueError("Feature store returned empty dataframe. Run materialize_features.py first.")
+            
+        # Get Target and Metadata from staging (or re-derive)
+        logger.info("Loading targets and metadata...")
+        df_targets = self.con.execute(f"""
+            SELECT player_name, year, team, {target_col}
+            FROM fact_player_efficiency
+            WHERE year BETWEEN 2015 AND 2025
+        """).df()
+        
+        # Merge Features and Targets
+        df = pd.merge(df_targets, df_features, on=['player_name', 'year'], how='inner')
         
         # 1. Split into features and target
-        skip_cols = ['player_name', 'year', 'experience_years', 'edce_risk', 'fair_market_value', 'ied_overpayment', 'value_metric_proxy']
+        skip_cols = ['player_name', 'year', 'team', target_col]
         X = df.drop(columns=[c for c in skip_cols if c in df.columns])
         
         # Robust numeric conversion
@@ -37,6 +63,7 @@ class RiskModeler:
         # 2. Retain player info for joining results back
         metadata = df[['player_name', 'year', 'team']]
         
+        logger.info(f"✓ Data Prepared: {len(X)} rows, {len(X.columns)} features.")
         return X, y, metadata
 
     def train_xgboost(self, X, y, metadata):
@@ -53,10 +80,14 @@ class RiskModeler:
         logger.info("Training Final Production Model on full history...")
         
         # Use config params
-        import yaml
-        with open("config/ml_config.yaml", "r") as f:
-             config = yaml.safe_load(f)
-        params = config["models"]["xgboost"]["params"]
+        try:
+             import yaml
+             with open("config/ml_config.yaml", "r") as f:
+                  config = yaml.safe_load(f)
+             params = config["models"]["xgboost"]["params"]
+        except Exception as e:
+             logger.warning(f"Could not load config: {e}. Using defaults.")
+             params = {'n_estimators': 100, 'max_depth': 4, 'learning_rate': 0.1}
         
         model = xgb.XGBRegressor(**params)
         model.fit(X, y, verbose=False)
@@ -70,18 +101,25 @@ class RiskModeler:
         logger.info(f"✓ Model Trained on full history ({len(X)} rows).")
         return model, X_test_proxy, backtest_results
     def generate_shap_report(self, model, X_test):
-        logger.info("Generating SHAP Transparency Explainer...")
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_test)
-        
-        plt.figure(figsize=(10, 6))
-        shap.summary_plot(shap_values, X_test, show=False)
-        plt.tight_layout()
-        report_path = os.getenv("REPORT_PATH", "reports/shap_summary.png")
-        plt.savefig(report_path, dpi=300, bbox_inches='tight')
-        logger.info(f"✓ SHAP summary plot saved to {report_path}")
-        
-        return shap_values
+        if shap is None:
+            logger.warning("SHAP library not available. Skipping explanation.")
+            return None
+            
+        try:
+            logger.info("Generating SHAP Transparency Explainer...")
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_test)
+            
+            plt.figure(figsize=(10, 6))
+            shap.summary_plot(shap_values, X_test, show=False)
+            plt.tight_layout()
+            report_path = os.getenv("REPORT_PATH", "reports/shap_summary.png")
+            plt.savefig(report_path, dpi=300, bbox_inches='tight')
+            logger.info(f"✓ SHAP summary plot saved to {report_path}")
+            return shap_values
+        except Exception as e:
+            logger.warning(f"SHAP generation failed (optional): {e}")
+            return None
 
     def save_predictions(self, model, X, metadata, metrics):
         import joblib

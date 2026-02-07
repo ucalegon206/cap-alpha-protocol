@@ -1,338 +1,69 @@
-# NFL Dead Money Pipeline - Production Documentation
+# Pipeline Documentation & Runbook
 
-## Overview
+**Operational Guide for the NFL Dead Money Pipeline**
 
-The **NFL Dead Money Pipeline** is a data orchestration system that ingests, transforms, and analyzes NFL salary cap impact from dead money contracts. It runs on **Apache Airflow 3.x** with **CeleryExecutor** and **Redis**, simulating production infrastructure used at major tech companies (Netflix, Uber, Airbnb).
-
----
-
-## Architecture
-
-### Infrastructure Stack
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Orchestrator** | Apache Airflow 3.x | Workflow scheduling & task management |
-| **Executor** | CeleryExecutor | Distributed task execution |
-| **Message Broker** | Redis | Task queue between scheduler & workers |
-| **Database** | SQLite | Metadata store (DAG runs, task instances) |
-| **Transform Engine** | DuckDB (Python API) | ELT & Mart generation |
-| **Storage** | DuckDB | Analytical data warehouse |
-
-### Key Features
-
-- **Distributed Execution**: Tasks run in parallel across Celery workers
-- **Retry Policy**: 2 retries with 5-minute delays for fault tolerance
-- **Weekly Scheduling**: `@weekly` schedule for automated runs
-- **Task Dependencies**: Enforced DAG ordering with clear data lineage
-- **Data Quality**: Validation checks before & after transformations
-
----
-
-## Pipeline DAG: `nfl_dead_money_pipeline` (Production Hardened)
-
-The current production entry point is `run_pipeline.py`, which implements the DAG logic in pure Python for high-fidelity local execution, while remaining fully compatible with Airflow extraction.
-
-### Task Execution Flow
-
-```
-[Start: run_pipeline.py]
-       ↓
-[Phase 1: Data Ingestion] (Parallel)
-    ├─ PFR Game Logs (Source: src/pfr_game_logs.py)
-    ├─ Spotrac Contracts (Source: src/spotrac_scraper_v2.py) 
-    └─ PFR Draft History (Source: src/pfr_draft_scraper.py)
-           ↓
-[Phase 2: Silver Layer Ingestion]
-    └─ ingest_to_duckdb.py (Raw CSVs -> DuckDB `silver_*` tables)
-           ↓
-[Phase 3: Feature Factory]
-    └─ src/feature_factory.py (Silver -> Gold `fact_player_efficiency`)
-       (Generates 1000+ Hyperscale Features: Lags, volatility, age curves)
-           ↓
-[Phase 4: Predictive Modeling]
-    └─ src/train_model.py (XGBoost Training)
-       (Target: `edce_risk` | Output: R2=0.9557)
-           ↓
-[Phase 5: Strategic Intelligence]
-    └─ src/strategic_engine.py
-       (Generates Risk Frontier & Prescriptions using FA/Draft context)
-           ↓
-[Phase 6: Reporting]
-    ├─ reports/nfl_team_strategic_audit_2025.md
-    └─ reports/production_risk_intelligence_2025.md
+## 1. Environment & Dependencies
+**CRITICAL**: This project enforces a "Local Libs" strategy to bypass macOS restrictions.
+Always load the local library path before execution:
+```bash
+export PYTHONPATH="$(pwd)/libs:$PYTHONPATH"
 ```
 
-### Task Definitions
+## 2. Core Workflows
 
-#### 1. **Snapshot Tasks** (Parallel Execution)
-- **snapshot_spotrac_team_cap**: Downloads current season team cap data from Spotrac
-- **snapshot_player_rankings_weekly**: Collects player ranking data weekly
-- **backfill_player_rankings_2015_2024**: One-time historical load of player rankings
+### Phase A: Data Ingestion (Bronze -> Silver)
+*(Legacy scrapers - run only if new data is needed)*
+```bash
+python3 src/scraper.py --year 2025
+python3 src/enrich_contracts.py
+```
 
-#### 2. **Staging Layer**
-- **stage_spotrac_raw_to_staging**: Loads raw Spotrac CSV files into staging tables
-  - Uses: `src/ingestion.py`
-  - Input: Raw CSV files in `data/raw/`
-  - Output: Staging tables in DuckDB
-
-#### 3. **Validation**
-- **validate_staging_tables**: Data quality checks
-  - Null checks, uniqueness, referential integrity
-  - Uses: `src/data_quality_tests.py`
-
-#### 4. **Reference Data**
-- **dbt_seed_spotrac**: Loads seed data for team mappings, historical constants
-  - Location: `dbt/seeds/`
-
-#### 5. **Transformation - Staging**
-- **dbt_run_staging**: dbt models for `staging/*`
-  - Cleaning, deduplication, type casting
-  - Joins raw and seed data
-
-#### 6. **Normalization**
-- **normalize_staging_to_processed**: Custom Python transformations
-  - Aggregations, calculated fields, business logic
-  - Uses: `src/normalization.py`
-
-#### 7. **Transformation - Marts**
-- **dbt_run_marts**: dbt models for `marts/*`
-  - Final aggregates: team dead money, player dead money, year-over-year trends
-  - Optimized for reporting & dashboards
-
-#### 8. **Quality Assurance**
-- **validate_player_rankings_quality**: Season-specific validation (retries 3x)
-- **validate_data_quality**: Full pipeline validation
-
-#### 9. **Final Processing**
-- **scrape_rosters**: Collect current NFL rosters from Pro Football Reference
-- **merge_dead_money**: Enrich roster data with dead money impact
-
----
-
-## Data Flow
-
-### Input Sources
-1. **Spotrac**: Team cap data (CSV snapshots)
-2. **Pro Football Reference (PFR)**: Historical rosters, contracts
-3. **Manual Upload**: Dead money CSV (OTC, NFLPA)
-
-### Transformations
-- **Raw → Staging**: Type conversion, normalization, deduplication
-- **Staging → Processing**: Business logic, aggregations, enrichment
-- **Processing → Marts**: Final models for analytics, reporting
-
-### Output Tables (DuckDB)
-
-| Table | Purpose | Updated |
-|-------|---------|---------|
-| `team_dead_money` | Annual dead money by team | Weekly |
-| `player_dead_money` | Player-level dead money impact | Weekly |
-| `roster_contracts` | Enriched roster + contract data | Weekly |
-| `cap_trends` | Year-over-year cap trends | Weekly |
-
-### Parquet Sidecars
-
-- Location: `data/processed/compensation/parquet/{table}/year=YYYY/part-000.parquet`
-- Tables emitted: `stg_team_cap`, `stg_player_rankings`, `stg_dead_money` (CSV remains for compatibility)
-- Notes: Requires `pyarrow` or `fastparquet`; writes are skipped (with warning) if engine is missing.
-
----
-
-## Configuration
-
-### Environment Variables
+### Phase B: Feature Materialization (Silver -> Gold)
+**Frequency**: Whenever Silver data changes or new features are defined.
+**Script**: `scripts/materialize_features.py`
+**Actions**:
+1.  Validates Temporal Integrity (dates).
+2.  Calculates Lag Features (Date-Based).
+3.  Calculates Interaction Features.
+4.  Populates `feature_values` table.
 
 ```bash
-# Airflow
-AIRFLOW_HOME=/path/to/airflow
-AIRFLOW__CORE__DAGS_FOLDER=/path/to/dags
-AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-
-# Celery
-AIRFLOW__CELERY__BROKER_URL=redis://localhost:6379/0
-AIRFLOW__CELERY__RESULT_BACKEND=redis://localhost:6379/0
-
-# DAG Settings
-AIRFLOW__CELERY__WORKER_SKIP_STALE_BUNDLE_CLEANUP=true
+python3 scripts/materialize_features.py
 ```
 
-### Retry Policy
-
-```python
-DEFAULT_ARGS = {
-    'retries': 2,
-    'retry_delay': timedelta(minutes=5),
-    'email_on_failure': True,
-}
-```
-
----
-
-## Running the Pipeline
-
-### Start Services
+### Phase C: Model Training (Gold -> Predictions)
+**Frequency**: Weekly (during season) or Ad-hoc.
+**Script**: `src/train_model.py`
+**Actions**:
+1.  Retrieves `min_year=2015` to `max_year=2025` data from Feature Store.
+2.  Performs Diagonal Join (As-Of Sept 1st).
+3.  Trains XGBoost with Walk-Forward Validation.
+4.  Generates SHAP plots and saves `prediction_results`.
 
 ```bash
-# Start Redis (required for Celery)
-brew services start redis
-
-# Start Scheduler (background)
-AIRFLOW_HOME=$(pwd)/airflow \
-  AIRFLOW__CORE__EXECUTOR=CeleryExecutor \
-  AIRFLOW__CELERY__BROKER_URL="redis://localhost:6379/0" \
-  AIRFLOW__CELERY__RESULT_BACKEND="redis://localhost:6379/0" \
-  PYTHONPATH=$(pwd) \
-  ./.venv/bin/airflow scheduler -l info &
-
-# Start Celery Worker (background)
-AIRFLOW_HOME=$(pwd)/airflow \
-  AIRFLOW__CORE__EXECUTOR=CeleryExecutor \
-  AIRFLOW__CELERY__BROKER_URL="redis://localhost:6379/0" \
-  AIRFLOW__CELERY__RESULT_BACKEND="redis://localhost:6379/0" \
-  AIRFLOW__CELERY__WORKER_SKIP_STALE_BUNDLE_CLEANUP=true \
-  PYTHONPATH=$(pwd) \
-  ./.venv/bin/airflow celery worker -l info \
-    --without-gossip --without-mingle --without-heartbeat &
+python3 src/train_model.py
 ```
 
-### Local Lineage/Metadata Quickstart (DataHub + OpenLineage)
-
-1) Start DataHub locally (Docker quickstart):
+### Phase D: Audit & Monitoring
+**Frequency**: Post-Training.
+**Script**: `scripts/population_audit.py`
+**Actions**:
+1.  Checks Population Coverage (% of targets with features).
+2.  Micro-Audits "Low Cap" vs "High Cap" performance (R2).
 
 ```bash
-pip install --upgrade datahub && datahub docker quickstart
-# UI: http://localhost:9002
+python3 scripts/population_audit.py
 ```
 
-2) Configure OpenLineage env for Airflow/dbt runs:
+## 3. Configuration
+Control model parameters and file paths via:
+- `config/ml_config.yaml`
+- `src/config_loader.py`
 
-```bash
-export OPENLINEAGE_URL=http://localhost:5000
-export OPENLINEAGE_NAMESPACE=nfl-dead-money
-```
+## 4. Troubleshooting
+**"No module named duckdb"**:
+- Ensure `PYTHONPATH` is set correctly.
+- Ensure dependencies are installed in `./libs`.
 
-3) Point DataHub client to local GMS:
-
-```bash
-export DATAHUB_GMS_HOST=localhost
-export DATAHUB_GMS_PORT=8080
-```
-
-4) After `dbt run`/`dbt test`, emit metadata (example):
-
-```bash
-datahub ingest -c datahub/lineage_openlineage_to_datahub.yml
-```
-
-5) Record key datasets for cataloging (DuckDB + Parquet):
-- DuckDB tables: `mart_team_summary`, `mart_player_cap_impact`
-- Parquet sidecars: `stg_team_cap`, `stg_player_rankings`, `stg_dead_money`
-
-Add these env vars to Airflow connections/worker env so DAG tasks emit lineage automatically when OpenLineage hooks are added.
-
-### Trigger a Run
-
-```bash
-AIRFLOW_HOME=$(pwd)/airflow \
-  AIRFLOW__CORE__EXECUTOR=CeleryExecutor \
-  AIRFLOW__CELERY__BROKER_URL="redis://localhost:6379/0" \
-  PYTHONPATH=$(pwd) \
-  ./.venv/bin/airflow dags trigger nfl_dead_money_pipeline
-```
-
-### Monitor Execution
-
-```bash
-# List active DAG runs
-AIRFLOW_HOME=$(pwd)/airflow PYTHONPATH=$(pwd) \
-  ./.venv/bin/python -c "
-from airflow.models import TaskInstance
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-engine = create_engine('sqlite:///airflow/airflow.db')
-Session = sessionmaker(bind=engine)
-session = Session()
-tasks = session.query(TaskInstance).filter(
-    TaskInstance.dag_id == 'nfl_dead_money_pipeline'
-).all()
-for t in tasks:
-    print(f'{t.task_id}: {t.state}')
-"
-```
-
----
-
-## Testing
-
-### Run dbt Tests
-
-```bash
-cd dbt
-../.venv/bin/dbt test --project-dir . --profiles-dir .
-```
-
-### Run Data Quality Tests
-
-```bash
-PYTHONPATH=. ./.venv/bin/python scripts/e2e_test.py
-```
-
----
-
-## Production Considerations
-
-### Scaling Strategies
-
-1. **Multiple Workers**: Add more Celery workers for parallel execution
-2. **Task Pooling**: Limit concurrent tasks with Airflow pools
-3. **Result Backend**: Use PostgreSQL instead of Redis for result storage
-4. **Monitoring**: Integrate with Datadog/New Relic for observability
-
-### High Availability
-
-- **Scheduler HA**: Use `KubernetesExecutor` for multi-node scheduling
-- **Worker Nodes**: Deploy on Kubernetes or EC2 autoscaling groups
-- **Database**: Use managed PostgreSQL (AWS RDS, Google Cloud SQL)
-- **Message Broker**: Use managed Redis (AWS ElastiCache, Google Memorystore)
-
-### Data Quality & Observability
-
-- **Validation**: dbt tests + custom Python validators
-- **Alerting**: Slack notifications on task failures
-- **Logging**: Centralized logs (ELK stack, CloudWatch)
-- **Monitoring**: Prometheus metrics on pipeline duration & success rates
-
----
-
-## Troubleshooting
-
-### Tasks Stuck in Queued State
-- Check Redis connection: `redis-cli ping`
-- Verify worker is running: `ps aux | grep celery`
-- Check scheduler logs: `tail -f airflow/logs/scheduler/*.log`
-
-### Stale Tasks
-- Clear task instances: `AIRFLOW_HOME=$(pwd)/airflow ./.venv/bin/airflow db clean`
-- Reset DAG serialization: Re-parse DAG with `dag-processor`
-
-### Memory Issues
-- Reduce `parallelism` setting in `airflow.cfg`
-- Increase worker concurrency limits
-- Monitor task resource usage
-
----
-
-## Further Reading
-
-- [Airflow Documentation](https://airflow.apache.org/)
-- [dbt Documentation](https://docs.getdbt.com/)
-- [Celery Documentation](https://docs.celeryproject.io/)
-- [DuckDB Documentation](https://duckdb.org/docs/)
-
----
-
-**Last Updated**: December 20, 2025  
-**Maintained By**: Data Engineering Team  
-**Contact**: See README.md
+**"Feature store returned empty dataframe"**:
+- Run `scripts/materialize_features.py` to hydrate the store.
