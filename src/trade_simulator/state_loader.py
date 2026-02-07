@@ -17,11 +17,17 @@ from typing import Dict, List
 from .state import LeagueState, TeamState
 
 class StateLoader:
-    def __init__(self, db_path: str, year: int = 2025, min_cap_hit: float = 2.0):
+    def __init__(self, db_path: str, year: int = 2025, min_cap_hit: float = None):
         self.con = duckdb.connect(db_path)
         self.year = year
-        self.min_cap_hit = min_cap_hit
         self.SALARY_CAP = 255.0 # Millions (Should be dynamic map in future)
+        
+        # Dynamic Threshold: Default to ~0.75% of Cap if not specified
+        # 2025 Example: 255 * 0.0075 = 1.91M (Close to the 2.0M heuristic)
+        if min_cap_hit is None:
+            self.min_cap_hit = self.SALARY_CAP * 0.0075
+        else:
+            self.min_cap_hit = min_cap_hit
 
     def load_league_state(self) -> LeagueState:
         print(f"🏈 Loading League State from DuckDB (Year: {self.year})...")

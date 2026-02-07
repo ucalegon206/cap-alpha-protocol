@@ -16,8 +16,8 @@ def run_league_scan():
     
     # 1. Hydrate Real State
     DB_PATH = "data/duckdb/nfl_production.db"
-    # Use $2M threshold to filter noise
-    loader = StateLoader(DB_PATH, year=2025, min_cap_hit=2.0)
+    # Use Dynamic Threshold (Default ~0.75% of Cap)
+    loader = StateLoader(DB_PATH, year=2025)
     initial_state = loader.load_league_state()
     
     # 2. Setup Agents (Dynamic Thresholds)
