@@ -18,6 +18,7 @@ class TeamState:
     cap_space: float # Millions
     needs: Dict[str, float] # {"QB": 0.9, "WR": 0.4} (0-1 Severity)
     roster_value: float # Aggregate AV
+    draft_capital: float = 100.0 # Default Draft Value (Jimmy Johnson Start)
     
 @dataclass
 class TradeAction:
@@ -48,39 +49,33 @@ class LeagueState:
         legal_trades = []
         team = self.teams[active_team]
         
-        # 1. Identify my biggest need
-        # e.g., "WR": 0.9 severity
+        # 1. Start with Needs
         if not team.needs:
             return []
             
-        target_pos = max(team.needs, key=team.needs.get)
-        
-        # 2. Scan other teams for surplus at this position
-        # Simplified: Just find any player with Value > 10 at that position
-        for other_name, other_team in self.teams.items():
-            if other_name == active_team:
-                continue
-                
-            # Assume we have access to a player list (in reality, this would be in TeamState)
-            # For POC, we'll iterate a mock list attached to this state
-            if not hasattr(self, 'market_players'):
-                return []
-                
-            for player in self.market_players:
-                if player['team'] == other_name and player['position'] == target_pos:
-                    # found a match!
-                    # Construct Trade Action
-                    # "I give nothing (for now), you give me player"
-                    action = TradeAction(
-                        source_team=other_name,
-                        target_team=active_team,
-                        player_id=player['id'],
-                        player_name=player['name'],
-                        player_value=player['value'],
-                        cap_hit=player['cap_hit'],
-                        compensation_picks=["2026-R3"] # Default cost
-                    )
-                    legal_trades.append(action)
+        # 2. Iterate through ALL needs, not just the top one
+        for target_pos, severity in team.needs.items():
+            # 3. Scan other teams for surplus at this position
+            for other_name, other_team in self.teams.items():
+                if other_name == active_team:
+                    continue
+                    
+                if not hasattr(self, 'market_players'):
+                    continue
+                    
+                for player in self.market_players:
+                    if player['team'] == other_name and player['position'] == target_pos:
+                        # found a match!
+                        action = TradeAction(
+                            source_team=other_name,
+                            target_team=active_team,
+                            player_id=player['id'],
+                            player_name=player['name'],
+                            player_value=player['value'],
+                            cap_hit=player['cap_hit'],
+                            compensation_picks=["2026-R3"] # Default cost, MCTS would refine this
+                        )
+                        legal_trades.append(action)
                     
         return legal_trades
 
@@ -90,12 +85,23 @@ class LeagueState:
         """
         new_teams = copy.deepcopy(self.teams)
         
-        # 1. Move Player
-        # Remove from Source, Add to Target (Logic placeholder)
+        source = new_teams[action.source_team]
+        target = new_teams[action.target_team]
+        
+        # 1. Move Player Value
+        source.roster_value -= action.player_value
+        target.roster_value += action.player_value
         
         # 2. Move Cap Hit
-        new_teams[action.source_team].cap_space += action.cap_hit # Dead Cap logic omitted for POC
-        new_teams[action.target_team].cap_space -= action.cap_hit
+        source.cap_space += action.cap_hit 
+        target.cap_space -= action.cap_hit
+        
+        # 3. Move Draft Capital (Simplified Heuristic)
+        # R3 = 15.0 Value (Jimmy Johnson / 10)
+        pick_val = 15.0 if "R3" in str(action.compensation_picks) else 5.0
+        
+        source.draft_capital += pick_val
+        target.draft_capital -= pick_val
 
         return LeagueState(new_teams, self.constraints)
 

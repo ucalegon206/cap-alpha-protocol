@@ -1,77 +1,98 @@
 #!/usr/bin/env python3
 """
-Trade Simulator: Orchestrator
+Trade Simulator: League-Wide Trade Scanner
 Author: Cap Alpha Protocol
 
-Objective: Run a sandbox simulation to demonstrate the Adversarial Trade Engine.
-Scenario:
-- KC (Contender): High Win Weight, Needs WR.
-- LV (Rebuilder): High Cap Weight, Surplus WR (Davante Adams).
+Objective: Scan ALL 32 teams for mutually beneficial trades based on finding "Surplus" to meet "Needs".
+Constraint: No forced narratives. Data driven only.
 """
 import sys
-from trade_simulator import LeagueState, TeamState, Agent, CONTENDER, MCTS, TeamPersona
+from trade_simulator import StateLoader, Agent, TeamPersona, CONTENDER
 
-def run_sandbox():
-    print("🏈 Initializing Adversarial Trade Engine (Sandbox Mode)...")
+import pandas as pd
+
+def run_league_scan():
+    print("🏈 Initializing League-Wide Trade Scanner (No Narratives)...")
     
-    # 1. Setup Mock League State
-    teams = {
-        "KC": TeamState(
-            name="KC",
-            cap_space=15.0, # Tight Cap
-            needs={"WR": 0.9, "CB": 0.2}, # Desperate for WR
-            roster_value=120.0 # Super Bowl Caliber
-        ),
-        "LV": TeamState(
-            name="LV",
-            cap_space=40.0, # Rebuilding
-            needs={"QB": 0.8, "DT": 0.5},
-            roster_value=60.0 # Struggling
-        ),
-        "BUF": TeamState( # Control Team
-            name="BUF",
-            cap_space=5.0,
-            needs={"S": 0.6},
-            roster_value=110.0
-        )
-    }
+    # 1. Hydrate Real State
+    DB_PATH = "data/duckdb/nfl_production.db"
+    # Use $2M threshold to filter noise
+    loader = StateLoader(DB_PATH, year=2025, min_cap_hit=2.0)
+    initial_state = loader.load_league_state()
     
-    initial_state = LeagueState(teams)
+    # 2. Setup Agents (Dynamic Thresholds)
+    # Calculate Cap Percentiles
+    caps = [t.cap_space for t in initial_state.teams.values()]
+    cap_series = pd.Series(caps)
+    low_cap_threshold = cap_series.quantile(0.25) # Bottom 25% = Cap Stressed
+    high_cap_threshold = cap_series.quantile(0.75) # Top 25% = Cap Rich
     
-    # Inject Mock Market Players (simplification for POC)
-    initial_state.market_players = [
-        {"id": "p1", "name": "Davante Adams", "team": "LV", "position": "WR", "value": 15.0, "cap_hit": 25.0},
-        {"id": "p2", "name": "Stefon Diggs", "team": "BUF", "position": "WR", "value": 14.0, "cap_hit": 20.0},
-        {"id": "p3", "name": "Maxx Crosby", "team": "LV", "position": "ED", "value": 18.0, "cap_hit": 22.0}
-    ]
+    print(f"💰 Dynamic Thresholds | Stressed < ${low_cap_threshold:.1f}M | Rich > ${high_cap_threshold:.1f}M")
     
-    print(f"Teams Loaded: {list(teams.keys())}")
+    agents = {}
+    for team_name, team_data in initial_state.teams.items():
+        if team_data.cap_space < low_cap_threshold:
+            # Cap Stressed / Contender Mode
+            agents[team_name] = Agent(team_name, CONTENDER)
+        elif team_data.cap_space > high_cap_threshold:
+            # Rebuilder Mode
+            agents[team_name] = Agent(team_name, TeamPersona(win_weight=0.2, cap_weight=0.6, draft_weight=0.2))
+        else:
+            # Balanced
+            agents[team_name] = Agent(team_name, TeamPersona(win_weight=0.5, cap_weight=0.3, draft_weight=0.2))
+
+    print(f"🕵️ Scanning {len(initial_state.teams)} Teams for Trade Opportunities...")
     
-    # 2. Setup Adversarial Agents
-    # KC = Contender (Values Wins)
-    # LV = Rebuilder (Values Cap/Picks)
-    agents = {
-        "KC": Agent("KC", CONTENDER),
-        "LV": Agent("LV", TeamPersona(win_weight=0.1, cap_weight=0.8, draft_weight=0.1)), # Aggressive Seller
-        "BUF": Agent("BUF", CONTENDER)
-    }
+    potential_trades = []
+
+    # 3. Iterate Every Team as a Potential "Buyer"
+    for buyer_name in initial_state.teams.keys():
+        buyer_agent = agents[buyer_name]
+        
+        # Get Candidate Trades (Buyer Needs matching Market Surplus)
+        candidates = initial_state.get_legal_actions(buyer_name)
+        
+        for trade in candidates:
+            # 4. Evaluate Mutual Benefit
+            # Buyer's Perspective
+            # Apply Action to get "Post-Trade State"
+            # NOTE: For speed, we just approximate utility delta here
+            # But the 'State.apply_action' is robust.
+            
+            post_trade_state = initial_state.apply_action(trade)
+            
+            buyer_delta = buyer_agent.evaluate_trade(initial_state, post_trade_state)
+            
+            # Seller's Perspective
+            seller_name = trade.source_team
+            seller_agent = agents[seller_name]
+            seller_delta = seller_agent.evaluate_trade(initial_state, post_trade_state)
+            
+            # 5. Filter: MUST be positive for BOTH
+            # (Adversarial Logic: No one makes a losing trade)
+            if buyer_delta > 0 and seller_delta > 0:
+                potential_trades.append({
+                    "buyer": buyer_name,
+                    "seller": seller_name,
+                    "player": trade.player_name,
+                    "cap": trade.cap_hit,
+                    "cost": trade.compensation_picks,
+                    "buyer_gain": buyer_delta,
+                    "seller_gain": seller_delta
+                })
+
+    # 6. Report
+    print(f"\n✅ Scan Complete. Found {len(potential_trades)} Mutually Beneficial Scenarios.\n")
     
-    # 3. Initialize MCTS
-    mcts = MCTS(initial_state, agents)
+    # Sort by Aggregate Utility (Maximize League Value)
+    potential_trades.sort(key=lambda x: x['buyer_gain'] + x['seller_gain'], reverse=True)
     
-    print("\n🔮 Running Monte Carlo Tree Search (500 Iterations)...")
-    best_action = mcts.search(iterations=500)
+    print(f"{'BUYER':<5} | {'SELLER':<6} | {'PLAYER':<20} | {'CAP':<6} | {'COST':<15} | {'SCORE'}")
+    print("-" * 75)
     
-    # 4. Results
-    if best_action:
-        print("\n✅ OPTIMAL TRADE IDENTIFIED:")
-        print(f"   Source: {best_action.source_team}")
-        print(f"   Target: {best_action.target_team} (Active Need: WR)")
-        print(f"   Asset:  {best_action.player_name} (${best_action.cap_hit}M)")
-        print(f"   Cost:   {best_action.compensation_picks}")
-        print("\n   Reasoning: Maximizes KC Win Probability while solving LV Cap Crisis.")
-    else:
-        print("\n❌ No mutually beneficial trades found.")
+    for pt in potential_trades[:50]: # Top 50
+        score = pt['buyer_gain'] + pt['seller_gain']
+        print(f"{pt['buyer']:<5} | {pt['seller']:<6} | {pt['player']:<20} | ${int(pt['cap'])}M | {str(pt['cost']):<15} | {score:.2f}")
 
 if __name__ == "__main__":
-    run_sandbox()
+    run_league_scan()

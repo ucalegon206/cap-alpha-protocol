@@ -45,7 +45,7 @@ class Agent:
         # In production, these come from the ML Model
         win_metric = team_data.roster_value # Proxy for Wins
         cap_metric = team_data.cap_space # Proxy for Financial Health
-        draft_metric = 0.0 # Placeholder
+        draft_metric = team_data.draft_capital # Value of Draft Picks
         
         return (self.persona.win_weight * win_metric) + \
                (self.persona.cap_weight * cap_metric) + \
