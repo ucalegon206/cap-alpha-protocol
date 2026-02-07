@@ -1,0 +1,54 @@
+name: Deployment Pipeline
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily at midnight
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  pipeline:
+    name: Run Data Pipeline & Deploy
+    runs-on: ubuntu-latest
+    env:
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      DB_PATH: data/nfl_data.db
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install dbt-core dbt-duckdb motherduck
+
+    - name: Create Data Directory
+      run: mkdir -p data/duckdb
+
+    - name: Run Data Pipeline
+      run: |
+        export PYTHONPATH=$PYTHONPATH:.
+        # Run ingestion and validation
+        python run_pipeline.py --skip-training --skip-audits
+
+    - name: Run dbt Transformations (Production)
+      run: |
+        cd dbt
+        dbt deps --profiles-dir .
+        dbt run --target prod --profiles-dir .
+        dbt test --target prod --profiles-dir .
+
+    - name: Sync to MotherDuck
+      run: |
+        export PYTHONPATH=$PYTHONPATH:.
+        python scripts/sync_to_motherduck.py
+
+    - name: Verification
+      run: echo "Deployment Pipeline Completed Successfully"

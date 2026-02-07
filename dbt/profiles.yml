@@ -7,4 +7,10 @@ nfl_dead_money:
       schema: main
       threads: 4
       memory_limit: 4gb
+    prod:
+      type: duckdb
+      path: 'md:nfl_dead_money'
+      threads: 4
+      settings:
+        motherduck_token: "{{ env_var('MOTHERDUCK_TOKEN') }}"
 
