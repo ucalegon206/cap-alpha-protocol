@@ -1,6 +1,6 @@
 
 import pytest
-import duckdb
+from src.db_manager import DBManager
 import pandas as pd
 from datetime import date
 from src.feature_store import FeatureStore
@@ -15,7 +15,7 @@ def store(tmp_path):
 
 def test_schema_dates(store):
     """Verify schema uses DATE types for validity."""
-    schema = store.con.execute("DESCRIBE feature_values").df()
+    schema = store.db.fetch_df("DESCRIBE feature_values")
     
     # Check valid_from is DATE
     valid_from_type = schema.loc[schema['column_name'] == 'valid_from', 'column_type'].iloc[0]
@@ -28,7 +28,7 @@ def test_schema_dates(store):
 def test_temporal_leakage_protection(store):
     """Ensure we cannot see features from the future."""
     # Setup: Feature known from 2023-02-01 until 2024-02-01
-    store.con.execute("""
+    store.db.execute("""
         INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
         VALUES ('P1_2023', 'PlayerOne', 2023, 'test_feat', 100.0, '2023-02-01', '2024-02-01')
     """)
@@ -45,7 +45,7 @@ def test_temporal_leakage_protection(store):
     # Query AFTER valid_until (Should be empty or superseded -- here empty locally)
     # Note: get_training_matrix normally filters by prediction year too, but focused on date joins
     # We simulate a 2024 prediction year query
-    store.con.execute("""
+    store.db.execute("""
         INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
         VALUES ('P1_2024', 'PlayerOne', 2024, 'test_feat', 200.0, '2024-02-01', NULL)
     """)
@@ -57,9 +57,9 @@ def test_temporal_leakage_protection(store):
 def test_lag_materialization_dates(store):
     """Test that lag materialization sets correct date boundaries."""
     # Mock source data
-    store.con.execute("CREATE TABLE fact_player_efficiency (player_name VARCHAR, year INTEGER, total_pass_yds INTEGER)")
-    store.con.execute("INSERT INTO fact_player_efficiency VALUES ('QB1', 2022, 4000)")
-    store.con.execute("INSERT INTO fact_player_efficiency VALUES ('QB1', 2023, 4500)")
+    store.db.execute("CREATE TABLE fact_player_efficiency (player_name VARCHAR, year INTEGER, total_pass_yds INTEGER)")
+    store.db.execute("INSERT INTO fact_player_efficiency VALUES ('QB1', 2022, 4000)")
+    store.db.execute("INSERT INTO fact_player_efficiency VALUES ('QB1', 2023, 4500)")
     
     # Materialize
     store.materialize_lag_features(source_table='fact_player_efficiency')
@@ -68,7 +68,7 @@ def test_lag_materialization_dates(store):
     # 2022 season data -> Known early 2023 (e.g. 2023-02-13 roughly Super Bowl)
     # The default impl should likely set it to YYYY+1-02-01 or similar constant
     
-    res = store.con.execute("""
+    res = store.db.execute("""
         SELECT feature_value, valid_from 
         FROM feature_values 
         WHERE feature_name = 'total_pass_yds_lag_1' AND prediction_year = 2023
@@ -92,7 +92,7 @@ def test_point_in_time_retrieval(store):
     # V2: Known 2022-06-01 -> Value 15 (Correction)
     # V3: Known 2023-02-01 -> Value 20 (Next season)
     
-    store.con.execute("""
+    store.db.execute("""
         INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
         VALUES 
         ('k1', 'P1', 2022, 'f1', 10.0, '2022-02-01', '2022-06-01'),

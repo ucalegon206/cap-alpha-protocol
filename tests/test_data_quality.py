@@ -1,4 +1,4 @@
-import duckdb
+from src.db_manager import DBManager
 import pytest
 import os
 import pandas as pd
@@ -11,9 +11,10 @@ def con():
     """Shared database connection for the module."""
     if not os.path.exists(DB_PATH):
         pytest.skip(f"Database not found at {DB_PATH}. Skipping Data Quality tests.")
-    conn = duckdb.connect(DB_PATH)
-    yield conn
-    conn.close()
+    
+    db = DBManager(DB_PATH)
+    yield db
+    db.close()
 
 # --- 1. Bronze/Silver Layer Validation ---
 
