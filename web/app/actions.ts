@@ -1,8 +1,7 @@
 'use server';
 
-import fs from 'fs';
-import path from 'path';
 import { z } from 'zod';
+import rosterData from '../data/roster_dump.json';
 
 // --- SCHEMA DEFINITIONS (The Bridge) ---
 
@@ -53,35 +52,17 @@ function generateMockFinancials(player: any): PlayerEfficiency {
 
 async function getHydratedData(): Promise<PlayerEfficiency[]> {
   try {
-    // UPDATED: Read from internal 'web/data' directory for Vercel deployment compatibility
-    // Vercel only bundles files inside the project root (web/)
-    const filePath = path.resolve(process.cwd(), 'data/roster_dump.json');
-
-    let rawData: any[] = [];
-
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf8');
-      rawData = JSON.parse(content);
-    } else {
-      console.warn(`[Data] Dump file not found at: ${filePath}. Using empty array.`);
-    }
+    const rawData: any[] = rosterData as any[];
 
     // Validate and Parse, applying Mock Fallback if needed
-    // In Production: We would throw error on validation fail.
-    // In Development (Now): We patch the data.
     const parsedData = rawData.map(item => {
-      // Validate structure
       const result = PlayerEfficiencySchema.safeParse(item);
       if (!result.success) {
-        // console.warn("Schema Validation Failed for item:", item.player_name, result.error);
-        // Fallback to strict default or skip? 
-        // For dev, let's try to salvage with mock gen if it looks like a player
         if (item.player_name) return generateMockFinancials(item);
         return null;
       }
 
       const p = result.data;
-      // PATCH: If we have valid schema but $0 data (the current bug), MOCK IT.
       if (p.cap_hit_millions === 0 && p.edce_risk === 0) {
         return generateMockFinancials(p);
       }
@@ -91,7 +72,7 @@ async function getHydratedData(): Promise<PlayerEfficiency[]> {
     return parsedData;
 
   } catch (e) {
-    console.error("[Data] Error reading/parsing dump:", e);
+    console.error("[Data] Error parsing roster data:", e);
     return [];
   }
 }
