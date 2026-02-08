@@ -1,7 +1,7 @@
 
 import pandas as pd
 import numpy as np
-import duckdb
+from src.db_manager import DBManager
 import logging
 from pathlib import Path
 
@@ -14,7 +14,8 @@ DB_PATH = get_db_path()
 
 class FeatureFactory:
     def __init__(self, db_path=DB_PATH):
-        self.con = duckdb.connect(db_path)
+        self.db = DBManager(db_path)
+        self.con = self.db.con
 
     def _validate_point_in_time(self, df):
         """Validate that lag features do not leak future data (Principal MLE Standard)."""
@@ -118,6 +119,5 @@ if __name__ == "__main__":
     factory = FeatureFactory()
     matrix = factory.generate_hyperscale_matrix()
     # Save as staging table
-    con = duckdb.connect(DB_PATH)
-    con.execute("CREATE OR REPLACE TABLE staging_feature_matrix AS SELECT * FROM matrix")
-    logger.info("✓ Staging feature matrix persisted to DuckDB.")
+    factory.db.execute("CREATE OR REPLACE TABLE staging_feature_matrix AS SELECT * FROM matrix", {"matrix": matrix})
+    logger.info("✓ Staging feature matrix persisted to database.")

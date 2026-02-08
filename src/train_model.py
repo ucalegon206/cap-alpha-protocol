@@ -1,7 +1,7 @@
 
 import pandas as pd
 import numpy as np
-import duckdb
+from src.db_manager import DBManager
 import logging
 import xgboost as xgb
 try:
@@ -35,9 +35,8 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 class RiskModeler:
     def __init__(self, db_path=DB_PATH, read_only=False):
-        self.db_path = db_path
-        self.read_only = read_only
-        self.con = duckdb.connect(db_path, read_only=read_only)
+        self.db = DBManager(db_path)
+        self.con = self.db.con
 
     def prepare_data(self, target_col='edce_risk'):
         logger.info(f"Loading feature matrix from FEATURE STORE...")
@@ -145,10 +144,10 @@ class RiskModeler:
         preds = model.predict(X)
         metadata['predicted_risk_score'] = preds
         
-        if self.read_only:
-            logger.info("Database is read-only. Skipping persistence to 'prediction_results' table.")
+        if self.db.db_path and "read_only" in self.db.db_path: # Simulated read_only check for manager
+             logger.info("Database is read-only. Skipping persistence to 'prediction_results' table.")
         else:
-            self.con.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata")
+            self.con.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata", {"metadata": metadata})
             logger.info("✓ Predictions persisted to 'prediction_results' table.")
         
         # 2. Save Model Artifact
@@ -212,7 +211,7 @@ class RiskModeler:
             if self.read_only:
                 logger.info("Database is read-only. Skipping persistence to 'prediction_explanations' table.")
             else:
-                self.con.execute("CREATE OR REPLACE TABLE prediction_explanations AS SELECT player_name, year, top_factors, all_factors FROM metadata_copy")
+                self.con.execute("CREATE OR REPLACE TABLE prediction_explanations AS SELECT player_name, year, top_factors, all_factors FROM metadata_copy", {"metadata_copy": metadata_copy})
                 logger.info("✓ Explanations persisted to 'prediction_explanations' (Top 3 + Full JSON).")
             
         except Exception as e:

@@ -22,7 +22,7 @@ Usage:
     features = store.get_training_matrix(as_of_year=2024)
 """
 
-import duckdb
+from src.db_manager import DBManager
 import pandas as pd
 import logging
 from datetime import date
@@ -40,9 +40,8 @@ class FeatureStore:
     """DuckDB-based Feature Store with point-in-time semantics."""
     
     def __init__(self, db_path: str = DB_PATH, read_only: bool = False):
-        self.db_path = db_path
-        self.read_only = read_only
-        self.con = duckdb.connect(db_path, read_only=read_only)
+        self.db = DBManager(db_path)
+        self.con = self.db.con
         
     def initialize_schema(self):
         """Create feature store tables if they don't exist."""

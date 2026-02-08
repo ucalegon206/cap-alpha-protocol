@@ -1,6 +1,6 @@
 
 import pandas as pd
-import duckdb
+from src.db_manager import DBManager
 import logging
 import joblib
 import os
@@ -91,34 +91,32 @@ class InferenceEngine:
         # But fact_player_efficiency PK might include 'team'.
         # Let's pivot: The easiest way is to push predictions to a temp table keyed by player/year
         
-        con = duckdb.connect(str(self.db_path))
-        
-        # Create a dataframe for the update
-        updates_df = X_aligned.reset_index()[['player_name', 'year']].copy()
-        updates_df['ml_risk_score'] = preds
-        
-        # Calculate simplistic Fair Market Value proxy
-        # If risk is high, value is simpler. If risk low, value high.
-        # We don't have 'fair_market_value' column in X_aligned unless it was a feature.
-        # Let's just update risk score for now as that is the critical artifact.
-        
-        con.execute("CREATE OR REPLACE TEMPORARY TABLE inference_results AS SELECT * FROM updates_df")
-        
-        # Add column if missing
-        con.execute("ALTER TABLE fact_player_efficiency ADD COLUMN IF NOT EXISTS ml_risk_score DOUBLE")
-        
-        # Update
-        con.execute("""
-            UPDATE fact_player_efficiency
-            SET ml_risk_score = inference_results.ml_risk_score
-            FROM inference_results
-            WHERE fact_player_efficiency.player_name = inference_results.player_name 
-              AND fact_player_efficiency.year = inference_results.year
-        """)
-        
-        count = con.execute("SELECT COUNT(*) FROM inference_results").fetchone()[0]
-        logger.info(f"✓ Updated {count} rows with ML Risk Scores (Source: FeatureStore).")
-        con.close()
+        with DBManager(str(self.db_path)) as db:
+            # Create a dataframe for the update
+            updates_df = X_aligned.reset_index()[['player_name', 'year']].copy()
+            updates_df['ml_risk_score'] = preds
+            
+            # Calculate simplistic Fair Market Value proxy
+            # If risk is high, value is simpler. If risk low, value high.
+            # We don't have 'fair_market_value' column in X_aligned unless it was a feature.
+            # Let's just update risk score for now as that is the critical artifact.
+            
+            db.execute("CREATE OR REPLACE TEMPORARY TABLE inference_results AS SELECT * FROM updates_df")
+            
+            # Add column if missing
+            db.execute("ALTER TABLE fact_player_efficiency ADD COLUMN IF NOT EXISTS ml_risk_score DOUBLE")
+            
+            # Update
+            db.execute("""
+                UPDATE fact_player_efficiency
+                SET ml_risk_score = inference_results.ml_risk_score
+                FROM inference_results
+                WHERE fact_player_efficiency.player_name = inference_results.player_name 
+                  AND fact_player_efficiency.year = inference_results.year
+            """)
+            
+            count = db.execute("SELECT COUNT(*) FROM inference_results").fetchone()[0]
+            logger.info(f"✓ Updated {count} rows with ML Risk Scores (Source: FeatureStore).")
 
 if __name__ == "__main__":
     from src.config_loader import get_db_path

@@ -89,8 +89,7 @@ class SilverLayer:
             if col not in df.columns: df[col] = None
 
         self.db.execute(f"DELETE FROM silver_spotrac_contracts WHERE year = {year}")
-        # DuckDB specific optimization for now, but DBManager handles the execution
-        self.db.execute("INSERT INTO silver_spotrac_contracts BY NAME SELECT DISTINCT * FROM df")
+        self.db.execute("INSERT INTO silver_spotrac_contracts BY NAME SELECT DISTINCT * FROM df", {"df": df})
 
         # Salaries
         sal_files = BronzeLayer.find_files("spotrac_player_salaries", year)
@@ -99,7 +98,7 @@ class SilverLayer:
             if 'player_name' in df_sal.columns:
                 df_sal['player_name'] = df_sal['player_name'].apply(clean_doubled_name)
             self.db.execute(f"DELETE FROM silver_spotrac_salaries WHERE year = {year}")
-            self.db.execute("INSERT INTO silver_spotrac_salaries BY NAME SELECT * FROM df_sal")
+            self.db.execute("INSERT INTO silver_spotrac_salaries BY NAME SELECT * FROM df_sal", {"df_sal": df_sal})
 
     def ingest_pfr(self, year: int):
         logger.info(f"SilverLayer: Ingesting PFR data for {year}")
@@ -122,7 +121,7 @@ class SilverLayer:
             df = df.rename(columns={tm_col: 'team'})
 
         self.db.execute(f"DELETE FROM silver_pfr_game_logs WHERE year = {year}")
-        self.db.execute("INSERT INTO silver_pfr_game_logs BY NAME SELECT * FROM df")
+        self.db.execute("INSERT INTO silver_pfr_game_logs BY NAME SELECT * FROM df", {"df": df})
 
     def ingest_penalties(self, year: int):
         logger.info(f"SilverLayer: Ingesting Penalties for {year}")
@@ -143,7 +142,7 @@ class SilverLayer:
         df['team'] = df['team_city'].map(city_map)
         
         self.db.execute(f"DELETE FROM silver_penalties WHERE year = {year}")
-        self.db.execute("INSERT INTO silver_penalties BY NAME SELECT * FROM df")
+        self.db.execute("INSERT INTO silver_penalties BY NAME SELECT * FROM df", {"df": df})
 
     def ingest_team_cap(self):
         logger.info("SilverLayer: Ingesting Team Cap data")
@@ -153,7 +152,7 @@ class SilverLayer:
         
         dfs = [pd.read_csv(f) for f in files]
         df = pd.concat(dfs)
-        self.db.execute("CREATE OR REPLACE TABLE silver_team_cap AS SELECT DISTINCT * FROM df")
+        self.db.execute("CREATE OR REPLACE TABLE silver_team_cap AS SELECT DISTINCT * FROM df", {"df": df})
 
     def ingest_others(self):
         logger.info("SilverLayer: Ingesting other static datasets")
@@ -168,7 +167,7 @@ class SilverLayer:
         draft_file = Path("data/raw/pfr/draft_history.csv")
         if draft_file.exists():
              df_draft = pd.read_csv(draft_file)
-             self.db.execute("CREATE OR REPLACE TABLE silver_pfr_draft_history AS SELECT * FROM df_draft")
+             self.db.execute("CREATE OR REPLACE TABLE silver_pfr_draft_history AS SELECT * FROM df_draft", {"df_draft": df_draft})
 
 class GoldLayer:
     """Gold Layer: Aggregating into Feature-Rich Analytics Tables."""
