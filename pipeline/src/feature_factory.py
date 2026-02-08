@@ -65,7 +65,7 @@ class FeatureFactory:
         # We need to sort by player/year
         df = df.sort_values(['player_name', 'year'])
         lag_cols = {}
-        for col in ['total_pass_yds', 'total_rush_yds', 'total_rec_yds', 'total_tds', 'games_played']:
+        for col in ['total_pass_yds', 'total_rush_yds', 'total_rec_yds', 'total_tds', 'games_played', 'total_sacks', 'total_int']:
             for lag in [1, 2, 3]:
                 lag_cols[f'{col}_lag_{lag}'] = df.groupby('player_name')[col].shift(lag)
         

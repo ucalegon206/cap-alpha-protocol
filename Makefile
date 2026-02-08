@@ -16,3 +16,10 @@ test:
 
 clean:
 	docker-compose down -v
+
+# Deploy local: Run pipeline -> Copy Data -> Ready for Web Dev
+deploy-local: pipeline
+	@echo "Deploying data to web app..."
+	@mkdir -p web/data
+	@cp data/roster_dump.json web/data/roster_dump.json
+	@echo "✅ Data Deployed to web/data/roster_dump.json"

@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS silver_pfr_game_logs (
     Receiving_Yds VARCHAR,
     Passing_TD VARCHAR,
     Rushing_TD VARCHAR,
-    Receiving_TD VARCHAR
+    Receiving_TD VARCHAR,
+    Sacks VARCHAR,
+    Interceptions VARCHAR
 );
 
 -- Player penalty statistics
@@ -111,6 +113,8 @@ CREATE TABLE IF NOT EXISTS fact_player_efficiency (
     total_tds INTEGER,
     total_penalty_count INTEGER,
     total_penalty_yards INTEGER,
+    total_sacks FLOAT,
+    total_int FLOAT,
     cap_hit_millions FLOAT,
     dead_cap_millions FLOAT,
     signing_bonus_millions FLOAT,

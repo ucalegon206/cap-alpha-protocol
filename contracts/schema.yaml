@@ -16,6 +16,8 @@ tables:
       Passing_TD: { type: "VARCHAR", description: "Passing Touchdowns (raw)" }
       Rushing_TD: { type: "VARCHAR", description: "Rushing Touchdowns (raw)" }
       Receiving_TD: { type: "VARCHAR", description: "Receiving Touchdowns (raw)" }
+      Sacks: { type: "VARCHAR", description: "Sacks (raw)" }
+      Interceptions: { type: "VARCHAR", description: "Interceptions (raw)" }
 
   silver_penalties:
     description: "Player penalty statistics"
@@ -115,6 +117,8 @@ tables:
       total_tds: { type: "INTEGER", description: "Total touchdowns" }
       total_penalty_count: { type: "INTEGER", description: "Total penalties" }
       total_penalty_yards: { type: "INTEGER", description: "Total penalty yards" }
+      total_sacks: { type: "FLOAT", description: "Total Sacks" }
+      total_int: { type: "FLOAT", description: "Total Interceptions" }
       cap_hit_millions: { type: "FLOAT", description: "Cap hit (M)" }
       dead_cap_millions: { type: "FLOAT", description: "Dead cap (M)" }
       signing_bonus_millions: { type: "FLOAT", description: "Signing bonus (M)" }

@@ -224,7 +224,12 @@ class RiskModeler:
             logger.warning(f"Failed to save explanations: {e}")
 
 if __name__ == "__main__":
-    modeler = RiskModeler(read_only=True)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--read-only", action="store_true", help="Run in read-only mode (no DB writes)")
+    args = parser.parse_args()
+    
+    modeler = RiskModeler(read_only=args.read_only)
     X, y, metadata = modeler.prepare_data()
     model, X_test, backtest_results = modeler.train_xgboost(X, y, metadata)
     
