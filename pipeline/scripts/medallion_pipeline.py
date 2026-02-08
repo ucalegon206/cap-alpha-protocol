@@ -104,6 +104,7 @@ class SilverLayer:
         if not files:
              # Fallback to generic search if specific year file not found
              logger.info(f"Specific year file not found, trying generic search...")
+             files = BronzeLayer.find_files("spotrac_player_contracts", year)
         if files:
             logger.info(f"Loading Spotrac Contracts from: {files[0]}")
             df = pd.read_csv(files[0])
