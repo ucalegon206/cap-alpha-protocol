@@ -4,18 +4,18 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'src/**'
-      - 'tests/**'
+      - 'pipeline/src/**'
+      - 'pipeline/tests/**'
       - 'data/processed/**'
-      - 'requirements.txt'
+      - 'pipeline/requirements.txt'
       - '.github/workflows/tests.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'src/**'
-      - 'tests/**'
+      - 'pipeline/src/**'
+      - 'pipeline/tests/**'
       - 'data/processed/**'
-      - 'requirements.txt'
+      - 'pipeline/requirements.txt'
 
 jobs:
   test:
@@ -39,20 +39,20 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r pipeline/requirements.txt
         pip install pytest pytest-cov
     
     - name: Run pytest tests
       run: |
-        pytest tests/ -v --tb=short --cov=src --cov-report=term-missing --cov-report=xml
+        pytest pipeline/tests/ -v --tb=short --cov=pipeline/src --cov-report=term-missing --cov-report=xml
       env:
-        PYTHONPATH: ${{ github.workspace }}
+        PYTHONPATH: ${{ github.workspace }}/pipeline
     
     - name: Run dead money validator directly
       run: |
-        python src/dead_money_validator.py
+        python pipeline/src/dead_money_validator.py
       env:
-        PYTHONPATH: ${{ github.workspace }}
+        PYTHONPATH: ${{ github.workspace }}/pipeline
       continue-on-error: true  # Report but don't block on validator WARN status
     
     - name: Upload coverage reports
@@ -83,17 +83,17 @@ jobs:
         pip install flake8 black isort
     
     - name: Check code formatting with black
-      run: black --check src/ tests/
+      run: black --check pipeline/src/ pipeline/tests/
     
     - name: Check import sorting with isort
-      run: isort --check-only src/ tests/
+      run: isort --check-only pipeline/src/ pipeline/tests/
     
     - name: Lint with flake8
       run: |
         # Stop the build if there are Python syntax errors or undefined names
-        flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 pipeline/src/ pipeline/tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
         # Check style issues (non-blocking)
-        flake8 src/ tests/ --count --max-line-length=127 --statistics || echo "Style issues found"
+        flake8 pipeline/src/ pipeline/tests/ --count --max-line-length=127 --statistics || echo "Style issues found"
 
   dbt_test:
     name: dbt Tests
