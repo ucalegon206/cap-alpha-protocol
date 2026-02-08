@@ -646,6 +646,146 @@
         "total_tds_lag_1"
       ],
       "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260207_081812.pkl",
+      "timestamp": "2026-02-07T08:18:13.002719",
+      "git_sha": "c25260c2fe4da9fc55e7c4ca1aa79a9f43d5d6e4",
+      "metrics": {
+        "rmse": 0.997547800034988,
+        "r2": 0.2811730597327964
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260207_082533.pkl",
+      "timestamp": "2026-02-07T08:25:33.940115",
+      "git_sha": "c25260c2fe4da9fc55e7c4ca1aa79a9f43d5d6e4",
+      "metrics": {
+        "rmse": 0.997547800034988,
+        "r2": 0.2811730597327964
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260207_083113.pkl",
+      "timestamp": "2026-02-07T08:31:13.374905",
+      "git_sha": "c25260c2fe4da9fc55e7c4ca1aa79a9f43d5d6e4",
+      "metrics": {
+        "rmse": 0.997547800034988,
+        "r2": 0.2811730597327964
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260207_083512.pkl",
+      "timestamp": "2026-02-07T08:35:12.483106",
+      "git_sha": "c25260c2fe4da9fc55e7c4ca1aa79a9f43d5d6e4",
+      "metrics": {
+        "rmse": 0.997547800034988,
+        "r2": 0.2811730597327964
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260207_083711.pkl",
+      "timestamp": "2026-02-07T08:37:11.954883",
+      "git_sha": "c25260c2fe4da9fc55e7c4ca1aa79a9f43d5d6e4",
+      "metrics": {
+        "rmse": 0.997547800034988,
+        "r2": 0.2811730597327964
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260207_083943.pkl",
+      "timestamp": "2026-02-07T08:39:43.878055",
+      "git_sha": "c25260c2fe4da9fc55e7c4ca1aa79a9f43d5d6e4",
+      "metrics": {
+        "rmse": 1.0266034529343213,
+        "r2": 0.2547328483962502
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
+    },
+    {
+      "path": "/tmp/models/xgboost_risk_model_20260207_132508.pkl",
+      "timestamp": "2026-02-07T13:25:08.563574",
+      "git_sha": "c25260c2fe4da9fc55e7c4ca1aa79a9f43d5d6e4",
+      "metrics": {
+        "rmse": 1.0266034529343213,
+        "r2": 0.2547328483962502
+      },
+      "feature_names": [
+        "age_cap_interaction",
+        "age_lag_1",
+        "cap_hit_millions_lag_1",
+        "games_played_lag_1",
+        "total_pass_yds_lag_1",
+        "total_rec_yds_lag_1",
+        "total_rush_yds_lag_1",
+        "total_tds_lag_1"
+      ],
+      "status": "candidate"
     }
   ],
   "history": []

@@ -14,7 +14,7 @@ DB_PATH = "data/duckdb/nfl_production.db"
 def run_audit():
     import sys
     print("Connecting to DB...", flush=True)
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(DB_PATH, read_only=True)
     
     # 1. Get ALL Targets (The Universe of Players we want to predict)
     print("Loading Target Population...")
@@ -132,3 +132,6 @@ def run_audit():
         
     except Exception as e:
         print(f"Could not analyze predictions: {e}")
+
+if __name__ == "__main__":
+    run_audit()

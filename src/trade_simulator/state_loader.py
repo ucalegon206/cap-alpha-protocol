@@ -112,13 +112,26 @@ class StateLoader:
         # 4. Hydrate Market Players (The "Trade Block")
         player_query = f"""
             WITH caps AS (
-                SELECT player_name, team, position, cap_hit_millions
+                SELECT 
+                    player_name, 
+                    team, 
+                    position, 
+                    SUM(cap_hit_millions) as cap_hit_millions
                 FROM silver_spotrac_contracts
                 WHERE year = {self.year}
+                GROUP BY player_name, team, position
             ),
+
             risk AS (
-                SELECT player_name, predicted_risk_score
+                SELECT player_name, MAX(predicted_risk_score) as predicted_risk_score
                 FROM prediction_results
+                WHERE year = {self.year}
+                GROUP BY player_name
+            ),
+            expl AS (
+                -- Left join to explanations (might not exist yet if model training is pending)
+                SELECT player_name, top_factors
+                FROM prediction_explanations
                 WHERE year = {self.year}
             )
             SELECT 
@@ -126,13 +139,48 @@ class StateLoader:
                 c.team,
                 c.position,
                 c.cap_hit_millions as cap_hit,
-                (1 - r.predicted_risk_score) * 10 as value -- 0-10 Scale
+                (1 - r.predicted_risk_score) * 10 as value, -- 0-10 Scale
+                e.top_factors
+            FROM caps c
+            JOIN risk r ON c.player_name = r.player_name
+            LEFT JOIN expl e ON c.player_name = e.player_name
+            WHERE c.cap_hit_millions >= {self.min_cap_hit}
+        """
+        
+        # Handle case where table doesn't exist yet (during CI or early init)
+        try:
+            df_players = self.con.execute(player_query).df()
+        except duckdb.CatalogException:
+            # Fallback if explanation table missing
+            print("⚠️ 'prediction_explanations' table missing. Skipping risk factors.")
+            fallback_query = player_query.replace("LEFT JOIN expl e ON c.player_name = e.player_name", "").replace(",\n                e.top_factors", "").replace("expl AS (\n                -- Left join to explanations (might not exist yet if model training is pending)\n                SELECT player_name, top_factors\n                FROM prediction_explanations\n                WHERE year = {self.year}\n            )", "")
+            # This replacement is messy, simpler to just re-define or use a flag. 
+            # Actually, let's just use the original query and catch error.
+            # Re-defining for clarity in fallback:
+            qm = f"""
+            WITH caps AS (
+                SELECT 
+                    player_name, team, position, SUM(cap_hit_millions) as cap_hit_millions
+                FROM silver_spotrac_contracts
+                WHERE year = {self.year}
+                GROUP BY player_name, team, position
+            ),
+            risk AS (
+                SELECT player_name, MAX(predicted_risk_score) as predicted_risk_score
+                FROM prediction_results
+                WHERE year = {self.year}
+                GROUP BY player_name
+            )
+            SELECT 
+                c.player_name as name, c.team, c.position, c.cap_hit_millions as cap_hit,
+                (1 - r.predicted_risk_score) * 10 as value
             FROM caps c
             JOIN risk r ON c.player_name = r.player_name
             WHERE c.cap_hit_millions >= {self.min_cap_hit}
-        """
-        df_players = self.con.execute(player_query).df()
-        
+            """
+            df_players = self.con.execute(qm).df()
+            df_players['top_factors'] = None
+
         # Convert to dictionary list
         market = []
         for idx, row in df_players.iterrows():
@@ -142,7 +190,8 @@ class StateLoader:
                 "team": row['team'],
                 "position": row['position'],
                 "value": row['value'],
-                "cap_hit": row['cap_hit']
+                "cap_hit": row['cap_hit'],
+                "risk_factors": row['top_factors'] if 'top_factors' in row and pd.notna(row['top_factors']) else None
             })
             
         state.market_players = market

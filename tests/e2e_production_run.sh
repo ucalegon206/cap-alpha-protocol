@@ -14,7 +14,7 @@ echo "[1/6] Running Scrapers (Year=2025, Week=1)..."
 # 2. INGESTION
 echo "-------------------------------------------------------"
 echo "[2/6] Ingesting Data to DuckDB (Year=2025)..."
-.venv/bin/python scripts/ingest_to_duckdb.py --year 2025 --week 1
+.venv/bin/python scripts/medallion_pipeline.py --year 2025 --week 1
 
 # 3. FEATURE ENGINEERING
 echo "[3/5] Building Feature Matrix..."

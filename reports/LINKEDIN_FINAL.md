@@ -17,18 +17,20 @@
 **Headline:** The NFL is a $20B Asset Market masquerading as a sport. 📉
 
 Every GM knows that penalties kill drives. That's intuitive.
-But in a cap-constrained world, **intuition isn't a line item.**
+But in a hyper-competitive, cap-constrained world, **intuition is not a line item.**
 
-I spent the last month building a **Strategic Intelligence Engine** to turn that intuition into hard pricing.
-I audited 15 years of data (41,000+ player-years) to answer one specific question: 
+I spent the last month building the **Cap Alpha Protocol (CAP)** to turn that intuition into precision pricing.
+I audited 15 years of data (41,000+ player-years) through an institutional-grade pipeline to answer one specific question: 
+
 **What is the exact financial drag of a "Discipline Tax"?**
 
-Using a Medallion Architecture (DuckDB + Python) and an XGBoost risk model, we put a dollar figure on the "Second-Order Volatility" that is silently eating 2025 cap space.
+Using a Medallion Architecture (DuckDB + Python) and an XGBoost risk model, the CAP quantifies the **Second-Order Volatility** that silently depletes franchise enterprise value.
 
-**The Findings:**
-*   🚫 **The Cost of Volatility:** Riley Moss (DEN) surrendered 203 penalty yards. We priced this as a **~$20.3M** depletion in field leverage value.
+**The 2025 Audit Findings:**
+*   🚫 **Capital Drag:** Riley Moss (DEN) surrendered 203 penalty yards. We priced this as a **~$20.3M** depletion in field leverage—roughly 10x his current contract.
 *   💎 **Commercial Alpha:** Jayden Daniels (WAS) isn't just a QB; he's a self-subsidizing profit center (Commercial Lift > Cap Hit).
-*   📉 **Debt Bubbles:** The Arizona Cardinals are sitting on a **$382M debt vector** of high-risk assets.
+*   📉 **Liquidity Traps:** The Arizona Cardinals are sitting on a **$382M debt bubble** of high-risk assets.
+
 
 **The "Statistical Arbitrage":**
 While teams like Denver (1085 yds) and Philly (977 yds) paid a massive "Discipline Tax," teams like **Seattle (623 yds)** and **New England (810 yds)** effectively shorted the volatility market.

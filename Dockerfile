@@ -1,44 +1,25 @@
-FROM python:3.11-slim
+FROM python:3.9-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    unzip \
-    curl \
-    git \
-    make \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Chromium (compatible with ARM64)
-RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-driver \
-    && rm -rf /var/lib/apt/lists/*
-
-# Environment variables for the scraper to locate the binaries
-ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMEDRIVER_BIN=/usr/bin/chromium-driver
-
-# Set up workspace
+# Set working directory
 WORKDIR /app
 
-# Copy requirements
-COPY requirements.txt .
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install webdriver-manager
+# Copy requirements FIRST to leverage Docker cache
+COPY requirements-frozen.txt .
 
-# Copy project
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements-frozen.txt
+
+# Copy source code
 COPY . .
 
-# Default command (overridden by docker-compose)
-CMD ["python", "src/run_historical_scrape.py", "--help"]
+# Create non-root user for security
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+# Default command
+CMD ["python3", "src/run_trade_sim.py"]

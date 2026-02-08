@@ -31,14 +31,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def materialize_all_features(validate_only: bool = False):
+def materialize_all_features(validate_only: bool = False, read_only: bool = False):
     """
     Materialize all features into the Feature Store.
     
     Args:
         validate_only: If True, only validate existing features without re-materializing
+        read_only: If True, open the database in read-only mode
     """
-    store = FeatureStore()
+    store = FeatureStore(read_only=read_only)
     
     # Initialize schema (idempotent)
     store.initialize_schema()
@@ -92,9 +93,11 @@ def main():
     parser = argparse.ArgumentParser(description='Materialize features into Feature Store')
     parser.add_argument('--validate-only', action='store_true',
                         help='Only validate existing features without re-materializing')
+    parser.add_argument('--read-only', action='store_true', default=True,
+                        help='Open the database in read-only mode (default: True)')
     args = parser.parse_args()
     
-    success = materialize_all_features(validate_only=args.validate_only)
+    success = materialize_all_features(validate_only=args.validate_only, read_only=args.read_only)
     sys.exit(0 if success else 1)
 
 

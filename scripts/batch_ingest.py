@@ -30,7 +30,7 @@ def main():
     for year in YEARS:
         print(f"📅 Ingesting {year}...", end=" ", flush=True)
         result = subprocess.run(
-            [sys.executable, "scripts/ingest_to_duckdb.py", "--year", str(year)],
+            [sys.executable, "scripts/medallion_pipeline.py", "--year", str(year)],
             capture_output=True,
             text=True,
             env={"DB_PATH": DB_PATH, "PYTHONPATH": ".", "PATH": "/usr/bin:/bin"}

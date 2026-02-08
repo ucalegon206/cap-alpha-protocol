@@ -3,11 +3,11 @@
 
 **(Header Image: `chart_brand_valuation.svg`)**
 
-The NFL salary cap ($273.3M) is not a suggestion—it is the hard constraint that defines the geometry of winning. Yet, in 2026, teams are still leaking millions in liquidity through what I call **"Second-Order Volatility."**
+The NFL salary cap ($273.3M) is not a suggestion—it is a hard constraint that defines the geometry of winning. Yet, in 2026, teams are still leaking millions in liquidity through what I call **"Second-Order Volatility."**
 
 While every fan sees a holding penalty, few Front Offices price it correctly.
 
-**I spent the last month building the Cap Alpha Protocol to fix that.**
+**I spent the last month building the Cap Alpha Protocol (CAP) to fix that.**
 By auditing 41,000+ player-years (2011–2025) through a disciplined quantitative pipeline, we have priced the unpriceable.
 
 #### 1. The "Dynasty Asset" Matrix

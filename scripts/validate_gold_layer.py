@@ -1,13 +1,17 @@
-
 import duckdb
 import logging
 import sys
 import pandas as pd
+from pathlib import Path
+
+# Ensure project root is in path
+sys.path.append(str(Path(__file__).parent.parent))
+from src.config_loader import get_db_path
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_belichick.db"
+DB_PATH = get_db_path()
 
 def validate_gold_layer():
     logger.info("--- Starting Gold Layer Validation ---")

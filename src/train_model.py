@@ -14,6 +14,16 @@ from sklearn.metrics import mean_squared_error, r2_score
 from pathlib import Path
 from src.feature_store import FeatureStore
 
+import numpy as np
+# PATCH NUMPY FOR SHAP COMPATIBILITY
+try:
+    if not hasattr(np, "_ARRAY_API"):
+        np._ARRAY_API = False
+    if not hasattr(np, "obj2sctype"):
+        np.obj2sctype = lambda x: np.dtype(x).type
+except Exception:
+    pass
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -24,15 +34,16 @@ MODEL_DIR = Path("/tmp/models")
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 class RiskModeler:
-    def __init__(self, db_path=DB_PATH):
+    def __init__(self, db_path=DB_PATH, read_only=False):
         self.db_path = db_path
-        self.con = duckdb.connect(db_path)
+        self.read_only = read_only
+        self.con = duckdb.connect(db_path, read_only=read_only)
 
     def prepare_data(self, target_col='edce_risk'):
         logger.info(f"Loading feature matrix from FEATURE STORE...")
         
         # Initialize store
-        store = FeatureStore(db_path=self.db_path)
+        store = FeatureStore(db_path=self.db_path, read_only=self.read_only)
         
         # Get historical features (diagonal join)
         # Using 2015-2025 range
@@ -133,8 +144,12 @@ class RiskModeler:
         # 1. Save Predictions to DB
         preds = model.predict(X)
         metadata['predicted_risk_score'] = preds
-        self.con.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata")
-        logger.info("✓ Predictions persisted to 'prediction_results' table.")
+        
+        if self.read_only:
+            logger.info("Database is read-only. Skipping persistence to 'prediction_results' table.")
+        else:
+            self.con.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata")
+            logger.info("✓ Predictions persisted to 'prediction_results' table.")
         
         # 2. Save Model Artifact
         with open("config/ml_config.yaml", "r") as f:
@@ -155,8 +170,56 @@ class RiskModeler:
         )
         logger.info("✓ Model registered in governance registry.")
 
+    def save_explanations(self, model, X, metadata):
+        if shap is None:
+            logger.warning("SHAP library not available. Skipping explanation.")
+            return
+
+        try:
+            logger.info("Generating SHAP Explanations for Rationale (Top 3 Factors)...")
+            explainer = shap.TreeExplainer(model)
+            # Use X (full dataset)
+            shap_values = explainer.shap_values(X)
+            
+            explanations = []
+            all_shap_scores = []
+            feature_names = X.columns.tolist()
+            
+            # Efficiently format strings & capture all data
+            import json
+            for i, row_values in enumerate(shap_values):
+                # filter out 0s for text, but keep for JSON?
+                # User asked for "ALL the scores", so let's keep even small ones?
+                # Actually, 0 means no contribution. but let's store non-zero.
+                contribs = [(feature_names[j], float(val)) for j, val in enumerate(row_values)]
+                
+                # 1. For Text Rationale (Top 3)
+                # Sort by abs value
+                contribs.sort(key=lambda x: abs(x[1]), reverse=True)
+                top_3 = contribs[:3]
+                factors = ", ".join([f"{name} ({val:+.2f})" for name, val in top_3])
+                explanations.append(factors)
+                
+                # 2. For Full Data Storage (JSON)
+                # Store as dict: {feature: score}
+                all_data = {name: val for name, val in contribs if val != 0}
+                all_shap_scores.append(json.dumps(all_data))
+                
+            metadata_copy = metadata.copy()
+            metadata_copy['top_factors'] = explanations
+            metadata_copy['all_factors'] = all_shap_scores
+            
+            if self.read_only:
+                logger.info("Database is read-only. Skipping persistence to 'prediction_explanations' table.")
+            else:
+                self.con.execute("CREATE OR REPLACE TABLE prediction_explanations AS SELECT player_name, year, top_factors, all_factors FROM metadata_copy")
+                logger.info("✓ Explanations persisted to 'prediction_explanations' (Top 3 + Full JSON).")
+            
+        except Exception as e:
+            logger.warning(f"Failed to save explanations: {e}")
+
 if __name__ == "__main__":
-    modeler = RiskModeler()
+    modeler = RiskModeler(read_only=True)
     X, y, metadata = modeler.prepare_data()
     model, X_test, backtest_results = modeler.train_xgboost(X, y, metadata)
     
@@ -171,3 +234,4 @@ if __name__ == "__main__":
     
     modeler.generate_shap_report(model, X_test)
     modeler.save_predictions(model, X, metadata, metrics)
+    modeler.save_explanations(model, X, metadata)

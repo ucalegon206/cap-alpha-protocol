@@ -39,12 +39,17 @@ DB_PATH = get_db_path()
 class FeatureStore:
     """DuckDB-based Feature Store with point-in-time semantics."""
     
-    def __init__(self, db_path: str = DB_PATH):
+    def __init__(self, db_path: str = DB_PATH, read_only: bool = False):
         self.db_path = db_path
-        self.con = duckdb.connect(db_path)
+        self.read_only = read_only
+        self.con = duckdb.connect(db_path, read_only=read_only)
         
     def initialize_schema(self):
         """Create feature store tables if they don't exist."""
+        if self.read_only:
+            logger.info("Database is read-only. Skipping schema initialization.")
+            return
+            
         logger.info("Initializing Feature Store schema...")
         
         # Feature Registry: Metadata about each feature

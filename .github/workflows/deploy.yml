@@ -1,6 +1,9 @@
 name: Deployment Pipeline
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '0 0 * * *' # Daily at midnight
   workflow_dispatch: # Allows manual trigger

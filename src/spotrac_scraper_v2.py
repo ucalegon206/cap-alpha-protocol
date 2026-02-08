@@ -7,6 +7,7 @@ Includes comprehensive data quality validation at ingestion and transformation s
 
 import pandas as pd
 import logging
+import random
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 import time
@@ -426,6 +427,11 @@ class SpotracScraper:
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         
+        # Add random window size to vary fingerprint slightly
+        w = random.randint(1280, 1920)
+        h = random.randint(720, 1080)
+        options.add_argument(f"--window-size={w},{h}")
+        
         import os
         chrome_bin = os.environ.get("CHROME_BIN")
         if chrome_bin:
@@ -488,16 +494,20 @@ class SpotracScraper:
         from bs4 import BeautifulSoup
         
         url = f"https://www.spotrac.com/nfl/cap/{year}/"
-        logger.info(f"Scraping team cap data: {url}")
-        
-        self.driver.get(url)
-        
-        # Wait for DataTable to load (Spotrac uses DataTables JS library)
         try:
+            # Human-like delay before navigation
+            time.sleep(random.uniform(2, 5))
+            self.driver.get(url)
+            
+            # Check for immediate block
+            if "Forbidden" in self.driver.title or "403" in self.driver.page_source:
+                logger.error(f"🛑 ACCESS BLOCKED (403) for {url}. Respecting anti-bot. Recommendation: Pause scraping.")
+                return pd.DataFrame()
+
             WebDriverWait(self.driver, 15).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "table.dataTable"))
             )
-            time.sleep(3)  # Let JS finish rendering
+            time.sleep(random.uniform(3, 7))  # Let JS finish rendering with jitter
         except Exception as e:
             raise DataQualityError(f"Failed to load table: {e}")
             
@@ -639,7 +649,14 @@ class SpotracScraper:
         url = f"https://www.spotrac.com/nfl/rankings/player/_/year/{year}/sort/cap_total"
         logger.info(f"Scraping player rankings (cap hit): {url}")
         
+        # Human-like delay
+        time.sleep(random.uniform(3, 6))
         self.driver.get(url)
+
+        # Check for immediate block
+        if "Forbidden" in self.driver.title or "403" in self.driver.page_source:
+            logger.error(f"🛑 ACCESS BLOCKED (403) for {url}.")
+            return pd.DataFrame()
         
         # Wait for table with very aggressive timeouts and JavaScript execution
         try:
@@ -833,7 +850,15 @@ class SpotracScraper:
                     else:
                         logger.info(f"  → {team_code} (retry {attempt}/{max_retries})")
 
+                    # Human-like delay
+                    time.sleep(random.uniform(2, 4))
                     self.driver.get(url)
+                    
+                    # Check for immediate block
+                    if "Forbidden" in self.driver.title or "403" in self.driver.page_source:
+                        logger.error(f"🛑 ACCESS BLOCKED (403) for {url}.")
+                        # On block, we stop this team and maybe the whole run if persistent
+                        break
                     time.sleep(2)
                     
                     # Use longer timeout and extended wait
@@ -968,7 +993,14 @@ class SpotracScraper:
             
         logger.info(f"Scraping player dead money: {url}")
         
+        # Human-like delay
+        time.sleep(random.uniform(3, 5))
         self.driver.get(url)
+
+        # Check for immediate block
+        if "Forbidden" in self.driver.title or "403" in self.driver.page_source:
+            logger.error(f"🛑 ACCESS BLOCKED (403) for {url}.")
+            return pd.DataFrame()
         
         # Wait for table
         try:

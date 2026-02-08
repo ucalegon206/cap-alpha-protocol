@@ -52,7 +52,7 @@ with DAG(
     # - Creating the Gold Layer (fact_player_efficiency) with Financial Lift logic
     ingest_and_transform = BashOperator(
         task_id='ingest_and_transform',
-        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} scripts/ingest_to_duckdb.py --year {{{{ dag_run.conf.get("year", 2025) }}}}',
+        bash_command=f'cd {PROJECT_ROOT} && {VENV_PYTHON} scripts/medallion_pipeline.py --year {{{{ dag_run.conf.get("year", 2025) }}}}',
     )
 
     # ========================================================================

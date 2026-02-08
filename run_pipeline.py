@@ -4,6 +4,7 @@ import logging
 import sys
 from pathlib import Path
 from src.strategic_engine import StrategicEngine
+from src.config_loader import get_db_path
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -35,9 +36,9 @@ def main():
     # 1. Ingestion & Normalization (Bronze/Silver)
     if not args.skip_ingest:
         for year in range(2011, 2026):
-             run_step(f"Ingestion {year}", f"scripts/ingest_to_duckdb.py --year {year} --skip-gold")
+             run_step(f"Ingestion {year}", f"scripts/medallion_pipeline.py --year {year} --skip-gold")
         # Build Gold Layer once after all ingestion
-        run_step("Build Gold Layer", "scripts/ingest_to_duckdb.py --year 2025 --gold-only")
+        run_step("Build Gold Layer", "scripts/medallion_pipeline.py --year 2025 --gold-only")
     else:
         logger.info("⏭️  Skipping Ingestion (Bronze Layer)")
     
@@ -71,7 +72,7 @@ def main():
             if candidate:
                 # Load candidate and validation data
                 model = joblib.load(candidate["path"])
-                con = duckdb.connect(os.getenv("DB_PATH", "data/nfl_data.db"))
+                con = duckdb.connect(get_db_path())
                 df = con.execute("SELECT * FROM staging_feature_matrix").df()
                 con.close()
                 
@@ -104,8 +105,7 @@ def main():
     if not args.skip_audits:
         logger.info("--- Starting Step: Strategic Audits ---")
         try:
-            import os
-            db_path = os.getenv("DB_PATH", "data/nfl_belichick.db")
+            db_path = get_db_path()
             engine = StrategicEngine(db_path)
             report_path = os.getenv("AUDIT_REPORT_PATH", "reports/nfl_team_strategic_audit_2025.md")
             engine.generate_audit_report(report_path, year=2025)
