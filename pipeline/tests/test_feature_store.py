@@ -11,6 +11,10 @@ def store(tmp_path):
     db_path = str(tmp_path / "test_feature_store.duckdb")
     store = FeatureStore(db_path=db_path)
     store.initialize_schema()
+    
+    # Mock the fact table which is required for get_training_matrix base spine
+    store.db.execute("CREATE TABLE IF NOT EXISTS fact_player_efficiency (player_name VARCHAR, year INTEGER, team VARCHAR)")
+    
     return store
 
 def test_schema_dates(store):
@@ -32,6 +36,9 @@ def test_temporal_leakage_protection(store):
         INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
         VALUES ('P1_2023', 'PlayerOne', 2023, 'test_feat', 100.0, '2023-02-01', '2024-02-01')
     """)
+    
+    # Mock base row for join - ensure types match schema (VARCHAR, INTEGER)
+    store.db.execute("INSERT INTO fact_player_efficiency VALUES ('PlayerOne', CAST(2023 AS INTEGER), 'TeamA')")
     
     # Query BEFORE valid_from (Should be empty)
     df_early = store.get_training_matrix(as_of_date=date(2023, 1, 1), min_year=2023)
@@ -57,6 +64,7 @@ def test_temporal_leakage_protection(store):
 def test_lag_materialization_dates(store):
     """Test that lag materialization sets correct date boundaries."""
     # Mock source data
+    store.db.execute("DROP TABLE IF EXISTS fact_player_efficiency")
     store.db.execute("CREATE TABLE fact_player_efficiency (player_name VARCHAR, year INTEGER, total_pass_yds INTEGER)")
     store.db.execute("INSERT INTO fact_player_efficiency VALUES ('QB1', 2022, 4000)")
     store.db.execute("INSERT INTO fact_player_efficiency VALUES ('QB1', 2023, 4500)")
@@ -99,6 +107,10 @@ def test_point_in_time_retrieval(store):
         ('k2', 'P1', 2022, 'f1', 15.0, '2022-06-01', '2023-02-01'),
         ('k3', 'P1', 2023, 'f1', 20.0, '2023-02-01', NULL)
     """)
+    
+    # Mock base rows for retrieval
+    store.db.execute("INSERT INTO fact_player_efficiency VALUES ('P1', 2022, 'TeamA')")
+    store.db.execute("INSERT INTO fact_player_efficiency VALUES ('P1', 2023, 'TeamA')")
     
     # 1. March 2022 -> Should see 10.0
     df_mar = store.get_training_matrix(as_of_date=date(2022, 3, 1), min_year=2022)
