@@ -37,22 +37,22 @@ def main():
     # 1. Ingestion & Normalization (Bronze/Silver)
     if not args.skip_ingest:
         for year in range(2011, 2026):
-             run_step(f"Ingestion {year}", f"scripts/medallion_pipeline.py --year {year} --skip-gold")
+             run_step(f"Ingestion {year}", f"pipeline/scripts/medallion_pipeline.py --year {year} --skip-gold")
         # Build Gold Layer once after all ingestion
-        run_step("Build Gold Layer", "scripts/medallion_pipeline.py --year 2025 --gold-only")
+        run_step("Build Gold Layer", "pipeline/scripts/medallion_pipeline.py --year 2025 --gold-only")
     else:
         logger.info("⏭️  Skipping Ingestion (Bronze Layer)")
     
     # 2. Feature Engineering (Gold Layer Enrichment Preparation)
     if not args.skip_features:
-        run_step("Feature Factory", "src/feature_factory.py")
+        run_step("Feature Factory", "pipeline/src/feature_factory.py")
     else:
         logger.info("⏭️  Skipping Feature Engineering")
         
     # 3. Model Training (Retrain from new data)
     # Train BEFORE enrichment to ensure a model exists for bootstrapping
     if not args.skip_training:
-        run_step("Production Training", "src/train_model.py")
+        run_step("Production Training", "pipeline/src/train_model.py")
         
         # 3.1 ML Red Team Evaluation & Promotion
         logger.info("--- Starting Step: ML Red Team Validation ---")
@@ -94,17 +94,17 @@ def main():
     # 4. Model Inference (Enrichment)
     # This must run AFTER Feature Factory and Training
     if not args.skip_training: 
-         run_step("Gold Layer Enrichment", "src/inference.py")
+         run_step("Gold Layer Enrichment", "pipeline/src/inference.py")
     
     # 5. Quality Gate (Silver/Gold Check)
     if not args.skip_validation:
-        run_step("Data Validation", "scripts/validate_gold_layer.py")
+        run_step("Data Validation", "pipeline/scripts/validate_gold_layer.py")
     else:
         logger.info("⏭️  Skipping Validation (Quality Gate)")
     
     # 5. Pipeline Integrity Testing (Formal pytest)
     if not args.skip_tests:
-        run_step("Integrity Testing", "-m pytest tests/test_gold_integrity.py")
+        run_step("Integrity Testing", "-m pytest pipeline/tests/test_gold_integrity.py")
     else:
         logger.info("⏭️  Skipping Tests (Integrity Layer)")
     
@@ -123,8 +123,8 @@ def main():
             sys.exit(1)
 
         # 7. Supplemental Reports
-        run_step("Super Bowl Audit", "scripts/generate_sb_audit.py")
-        run_step("Intelligence Report", "scripts/generate_intelligence_report.py")
+        run_step("Super Bowl Audit", "pipeline/scripts/generate_sb_audit.py")
+        run_step("Intelligence Report", "pipeline/scripts/generate_intelligence_report.py")
     else:
          logger.info("⏭️  Skipping Audits (Reporting Layer)")
     
