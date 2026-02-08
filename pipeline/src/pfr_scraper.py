@@ -48,10 +48,10 @@ def fetch_pfr_tables(url: str, rate_limit: float = 3.0) -> Dict[str, pd.DataFram
         tables = {}
         
         # Parse visible tables
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(html, 'html.parser')
         for tbl in soup.find_all('table'):
             try:
-                df = pd.read_html(StringIO(str(tbl)))[0]
+                df = pd.read_html(StringIO(str(tbl)), flavor='bs4')[0]
                 tbl_id = tbl.get('id') or f'table_{len(tables)+1}'
                 tables[tbl_id] = df
                 logger.debug(f"Extracted visible table: {tbl_id}")
@@ -61,10 +61,10 @@ def fetch_pfr_tables(url: str, rate_limit: float = 3.0) -> Dict[str, pd.DataFram
         # Parse tables inside HTML comments
         comments = re.findall(r'<!--(.*?)-->', html, flags=re.S)
         for block in comments:
-            block_soup = BeautifulSoup(block, 'lxml')
+            block_soup = BeautifulSoup(block, 'html.parser')
             for tbl in block_soup.find_all('table'):
                 try:
-                    df = pd.read_html(StringIO(str(tbl)))[0]
+                    df = pd.read_html(StringIO(str(tbl)), flavor='bs4')[0]
                     tbl_id = tbl.get('id') or f'comment_table_{len(tables)+1}'
                     if tbl_id not in tables:  # Avoid duplicates
                         tables[tbl_id] = df

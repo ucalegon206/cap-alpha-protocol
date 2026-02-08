@@ -137,9 +137,17 @@ def scrape_pfr_gamelogs(year):
         # Final cleanup
         df_out = df_merged.drop(columns=['merge_key'])
         
+        # FIX: Apply cleaning to the final player_name column (remove *, +) because Spotrac keys don't have them
+        df_out['player_name'] = df_out['player_name'].astype(str).str.replace('*', '', regex=False).str.replace('+', '', regex=False).str.strip()
+        
         # Filter out junk
         df_out = df_out.dropna(subset=['player_name'])
         
+        # FIX: Deduplicate. If a player/team combo appears twice, keep the one with most games or just first.
+        # This handles the case if outer join created ghosts or PFR has duplicates.
+        df_out = df_out.drop_duplicates(subset=['player_name', 'team'], keep='first')
+        
+        # Save
         # Save
         output_dir = Path(f"data/raw/pfr/{year}")
         output_dir.mkdir(parents=True, exist_ok=True)

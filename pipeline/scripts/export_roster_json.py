@@ -28,9 +28,16 @@ def export_roster_json():
             f.team, 
             f.position, 
             f.cap_hit_millions, 
-            p.predicted_risk_score as ml_risk_score,
+            -- Normalize Risk Score: (Risk $ / Cap Hit $) -> Ratio 0.0 to 1.0 (or >1.0 for toxic)
+            CASE 
+                WHEN f.cap_hit_millions > 0 THEN 
+                    LEAST(GREATEST(COALESCE(p.predicted_risk_score, f.edce_risk) / f.cap_hit_millions, 0.0), 1.0)
+                ELSE 0.0 
+            END as risk_score,
+            p.predicted_risk_score as raw_risk_dollars,
             f.edce_risk,
-            f.fair_market_value
+            f.fair_market_value,
+            f.fair_market_value - f.cap_hit_millions as surplus_value
         FROM fact_player_efficiency f
         LEFT JOIN prediction_results p 
           ON f.player_name = p.player_name 

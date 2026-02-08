@@ -35,6 +35,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { NFL_TEAMS } from "@/lib/utils"
 
 export type PlayerMetric = {
     player_name: string
@@ -146,15 +147,47 @@ export const columns: ColumnDef<PlayerMetric>[] = [
 
 export function RosterGrid({ data }: { data: PlayerMetric[] }) {
     const [sorting, setSorting] = React.useState<SortingState>([])
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-        []
-    )
-    const [columnVisibility, setColumnVisibility] =
-        React.useState<VisibilityState>({})
+    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
     const [rowSelection, setRowSelection] = React.useState({})
+    const [teamFilter, setTeamFilter] = React.useState<string>("all")
+    const [posFilter, setPosFilter] = React.useState<string>("all")
+    const [confFilter, setConfFilter] = React.useState<string>("all")
+    const [capFilter, setCapFilter] = React.useState<string>("all")
+
+    // Filter Logic
+    const filteredData = React.useMemo(() => {
+        return data.filter(item => {
+            const matchesTeam = teamFilter === "all" || item.team === teamFilter
+            const matchesPos = posFilter === "all" || item.position === posFilter
+            // @ts-ignore
+            const matchesConf = confFilter === "all" || (NFL_TEAMS[item.team] === confFilter)
+
+            let matchesCap = true
+            if (capFilter === "high") matchesCap = item.cap_hit_millions >= 2.0
+            if (capFilter === "mid") matchesCap = item.cap_hit_millions >= 1.0 && item.cap_hit_millions < 2.0
+            if (capFilter === "low") matchesCap = item.cap_hit_millions < 1.0
+
+            return matchesTeam && matchesPos && matchesConf && matchesCap
+        })
+    }, [data, teamFilter, posFilter, confFilter, capFilter])
+
+    // Keyboard Shortcut: ESC to reset
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setTeamFilter("all")
+                setPosFilter("all")
+                setConfFilter("all")
+                setCapFilter("all")
+            }
+        }
+        window.addEventListener("keydown", handleKeyDown)
+        return () => window.removeEventListener("keydown", handleKeyDown)
+    }, [])
 
     const table = useReactTable({
-        data,
+        data: filteredData,
         columns,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
@@ -172,17 +205,88 @@ export function RosterGrid({ data }: { data: PlayerMetric[] }) {
         },
     })
 
+    // Get unique values for dropdowns
+    const uniqueTeams = Array.from(new Set(data.map(d => d.team))).sort()
+    const uniquePositions = Array.from(new Set(data.map(d => d.position))).sort()
+
     return (
         <div className="w-full">
-            <div className="flex items-center py-4">
+            <div className="flex items-center py-4 gap-2">
                 <Input
-                    placeholder="Filter players..."
+                    placeholder="Search players..."
                     value={(table.getColumn("player_name")?.getFilterValue() as string) ?? ""}
                     onChange={(event) =>
                         table.getColumn("player_name")?.setFilterValue(event.target.value)
                     }
                     className="max-w-sm"
                 />
+
+                {/* Conference Filter */}
+                <select
+                    className="h-10 w-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={confFilter}
+                    onChange={(e) => setConfFilter(e.target.value)}
+                >
+                    <option value="all">All Conf</option>
+                    <option value="AFC">AFC</option>
+                    <option value="NFC">NFC</option>
+                </select>
+
+                {/* Team Filter */}
+                <select
+                    className="h-10 w-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={teamFilter}
+                    onChange={(e) => setTeamFilter(e.target.value)}
+                >
+                    <option value="all">All Teams</option>
+                    {uniqueTeams.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                    ))}
+                </select>
+
+                {/* Position Filter */}
+                <select
+                    className="h-10 w-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={posFilter}
+                    onChange={(e) => setPosFilter(e.target.value)}
+                >
+                    <option value="all">All Pos</option>
+                    {uniquePositions.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                    ))}
+                </select>
+
+                {/* Cap Tier Filter */}
+                <select
+                    className="h-10 w-[130px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={capFilter}
+                    onChange={(e) => setCapFilter(e.target.value)}
+                >
+                    <option value="all">All Caps</option>
+                    <option value="high">High (&gt;$2M)</option>
+                    <option value="mid">Mid ($1-2M)</option>
+                    <option value="low">Low (&lt;$1M)</option>
+                </select>
+
+                {(teamFilter !== "all" || posFilter !== "all" || confFilter !== "all" || capFilter !== "all" || (table.getColumn("player_name")?.getFilterValue() as string)?.length > 0) && (
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            setTeamFilter("all")
+                            setPosFilter("all")
+                            setConfFilter("all")
+                            setCapFilter("all")
+                            table.getColumn("player_name")?.setFilterValue("")
+                        }}
+                        className="h-10 px-2 lg:px-3"
+                    >
+                        Reset
+                        <span className="ml-2 text-xs text-muted-foreground hidden lg:inline-block">
+                            (Esc)
+                        </span>
+                    </Button>
+                )}
+
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="ml-auto">

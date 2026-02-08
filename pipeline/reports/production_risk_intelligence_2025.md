@@ -7,47 +7,47 @@ Analysis of the **Seattle Seahawks** and **New England Patriots** rosters ahead 
 
 | Player | Team | Risk Exposure | Financial Load | Profile |
 | :--- | :--- | :--- | :--- | :--- |
-| Milton Williams | NE | **🔴 HIGH** (49.99) | $104.0M | Age 26 DL |
-| Charles Cross | SEA | **🔴 HIGH** (42.60) | $104.4M | Age 25 LT |
-| Will Campbell | NE | **🔴 HIGH** (42.11) | $43.7M | Age 21 T |
-| Sam Darnold | SEA | **🔴 HIGH** (38.56) | $100.5M | Age 27 QB |
-| Drake Maye | NE | **🔴 HIGH** (37.17) | $36.6M | Age 21 QB |
+| Milton Williams | NE | **🔴 HIGH** (50.22) | $104.0M | Age 26 DL |
+| Charles Cross | SEA | **🔴 HIGH** (42.22) | $104.4M | Age 25 LT |
+| Will Campbell | NE | **🔴 HIGH** (41.94) | $43.7M | Age 21 T |
+| Sam Darnold | SEA | **🔴 HIGH** (38.60) | $100.5M | Age 27 QB |
+| Drake Maye | NE | **🔴 HIGH** (37.82) | $36.6M | Age 21 QB |
 | Mike Onwenu | NE | **🔴 HIGH** (34.50) | $57.0M | Age 26 RT |
-| Carlton Davis | NE | **🔴 HIGH** (33.64) | $54.0M | Age 28 CB |
-| Christian Barmore | NE | **🔴 HIGH** (32.73) | $83.0M | Age 24 DL |
-| Uchenna Nwosu | SEA | **🔴 HIGH** (31.61) | $45.0M | Age 26 LB |
-| Devon Witherspoon | SEA | **🔴 HIGH** (30.77) | $31.9M | Age 22 CB |
+| Christian Barmore | NE | **🔴 HIGH** (32.93) | $83.0M | Age 24 DL |
+| Carlton Davis | NE | **🔴 HIGH** (32.62) | $54.0M | Age 28 CB |
+| Devon Witherspoon | SEA | **🔴 HIGH** (31.81) | $31.9M | Age 22 CB |
+| Uchenna Nwosu | SEA | **🔴 HIGH** (31.54) | $45.0M | Age 26 LB |
 
 
 ````carousel
 ### 🚨 The Danger Frontier: Top 10 League-Wide Risks
 | Player | Team | Risk Score | Cap Hit |
 | :--- | :--- | :--- | :--- |
-| Deshaun Watson | CLE | **229.410** | $230.0M |
-| Josh Allen | BUF | **146.943** | $330.0M |
-| Joe Burrow | CIN | **146.204** | $275.0M |
-| Trevor Lawrence | JAX | **142.416** | $275.0M |
-| Lamar Jackson | BAL | **135.513** | $260.0M |
-| Justin Herbert | LAC | **132.882** | $262.5M |
-| Dak Prescott | DAL | **129.746** | $240.0M |
-| Micah Parsons | GB | **122.568** | $186.0M |
-| Jared Goff | DET | **113.410** | $212.0M |
-| Jalen Hurts | PHI | **110.122** | $255.0M |
+| Deshaun Watson | CLE | **228.619** | $230.0M |
+| Josh Allen | BUF | **147.037** | $330.0M |
+| Joe Burrow | CIN | **145.877** | $275.0M |
+| Trevor Lawrence | JAX | **142.654** | $275.0M |
+| Lamar Jackson | BAL | **135.088** | $260.0M |
+| Justin Herbert | LAC | **134.221** | $262.5M |
+| Dak Prescott | DAL | **129.168** | $240.0M |
+| Micah Parsons | GB | **122.667** | $186.0M |
+| Jared Goff | DET | **113.561** | $212.0M |
+| Jalen Hurts | PHI | **110.430** | $255.0M |
 
 <!-- slide -->
 ### 💎 Efficiency Gems: Low-Risk, High-Output
 | Player | Team | Value Metric | Risk Score |
 | :--- | :--- | :--- | :--- |
-| Easton Stick | ATL | **0.00** | 0.024 |
-| Jones Jr. Carl Jones Jr. | BAL | **0.00** | 0.195 |
-| Terrell Edmunds | LV | **0.00** | 0.155 |
-| Chance Campbell | PHI | **0.00** | 0.132 |
-| Jonathan Ford | GB | **0.00** | 0.188 |
-| Chris Moore | WAS | **0.00** | 0.124 |
-| Will Sheppard | GB | **0.00** | 0.029 |
-| Garret Wallow | SF | **0.00** | 0.128 |
-| George Holani | SEA | **0.00** | 0.184 |
-| Jalen Graham | SF | **0.00** | 0.112 |
+| Puka Nacua | LAR | **72.36** | 0.130 |
+| Antonio Johnson | JAX | **33.00** | 0.182 |
+| Bucky Irving | TB | **29.97** | 0.167 |
+| Kimani Vidal | LAC | **28.42** | -0.128 |
+| Zonovan Knight | ARI | **25.72** | -0.095 |
+| Tez Johnson | TB | **24.19** | 0.197 |
+| Dondrea Tillman | DEN | **23.50** | 0.086 |
+| Jake Tonges | SF | **23.27** | 0.010 |
+| Emanuel Wilson | GB | **21.51** | -0.031 |
+| Tory Horton | SEA | **20.90** | 0.114 |
 
 ````
 

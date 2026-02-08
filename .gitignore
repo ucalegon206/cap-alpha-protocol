@@ -19,6 +19,7 @@ airflow/*.json
 # Data
 data/
 !data/raw/logos/
+!data/roster_dump.json
 
 # Notebook Outputs
 notebooks/outputs/

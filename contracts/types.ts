@@ -23,6 +23,10 @@ export interface SilverPfrGameLogs {
   Rushing_TD: string;
   /** Receiving Touchdowns (raw) */
   Receiving_TD: string;
+  /** Sacks (raw) */
+  Sacks: string;
+  /** Interceptions (raw) */
+  Interceptions: string;
 }
 
 /** Player penalty statistics */
@@ -179,6 +183,10 @@ export interface FactPlayerEfficiency {
   total_penalty_count: number;
   /** Total penalty yards */
   total_penalty_yards: number;
+  /** Total Sacks */
+  total_sacks: number;
+  /** Total Interceptions */
+  total_int: number;
   /** Cap hit (M) */
   cap_hit_millions: number;
   /** Dead cap (M) */

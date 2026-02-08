@@ -1,0 +1,31 @@
+cc:
+@Valery Yundin
+@Brighid Meredith
+@Jason Schissel
+@Zac Boller
+@Yifei Feng
+@Sebastiaan Boer
+@Callum McCann
+@Sam Jafari
+@Chad Gibbs IV
+@Supriya Prasad
+@Tom Honeybone
+@Akashdeep Singh Jaswal
+@Brent Cohn
+@Sarina Malik
+
+(Note: LinkedIn does not support pasting active tags. You will likely need to re-type the "@" before each name to trigger the dropdown selector.)
+
+---
+
+**Comment Text:**
+
+"Detailed Technical Breakdown for the network:
+
+Similar to our work on 'Capital Efficiency' infrastructure at Meta, this pipeline treats the NFL Salary Cap not as a budget, but as a hard-constraint optimization problem.
+
+I prioritized **idempotency** (DuckDB) and **interpretability** (SHAP) over black-box complexity because—as we know—if you can't explain the variance to a VP, the model doesn't ship.
+
+Would love thoughts from the crew on the 'Discipline Tax' findings!
+
+@Valery Yundin @Brighid Meredith @Jason Schissel @Zac Boller @Chad Gibbs IV @Supriya Prasad @Sam Jafari @Callum McCann @Yifei Feng @Akashdeep Singh Jaswal @Sarina Malik"

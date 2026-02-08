@@ -37,13 +37,24 @@ class BronzeLayer:
     """Bronze Layer: Raw Data Discovery & Reading."""
     @staticmethod
     def find_files(pattern: str, year: int) -> List[Path]:
-        source_dirs = ['spotrac', 'pfr', 'penalties', 'dead_money']
-        for source in source_dirs:
-            year_dir = BRONZE_DIR / source / str(year)
-            if year_dir.exists():
-                files = list(year_dir.glob(f"{pattern}*.csv"))
+        # Search both bronze (standard) and raw (legacy/scraper output)
+        search_paths = [
+            BRONZE_DIR / 'spotrac' / str(year),
+            Path(f"data/raw"),
+            Path(f"data/raw/spotrac/{year}")
+        ]
+        
+        for search_dir in search_paths:
+            if search_dir.exists():
+                # Recursive search in raw because structure varies
+                if 'raw' in str(search_dir):
+                    files = list(search_dir.rglob(f"{pattern}*.csv"))
+                else:
+                    files = list(search_dir.glob(f"{pattern}*.csv"))
+                
                 if files:
-                    files.sort()
+                    # Sort by modification time (newest first) to get latest scrape
+                    files.sort(key=lambda x: x.stat().st_mtime)
                     return [files[-1]]
         return []
 
@@ -120,6 +131,11 @@ class SilverLayer:
                  logger.warning(f"Could not find 'dead cap' column in Spotrac Salaries {year}. Columns: {df_sal.columns.tolist()}")
                  df_sal["dead cap"] = "0"
 
+            # Ensure columns exist
+            if 'position' not in df_sal.columns:
+                 # Try to infer or leave null
+                 df_sal['position'] = None
+                 
             self.db.execute(f"DELETE FROM silver_spotrac_salaries WHERE year = {year}")
             self.db.execute("""
                 INSERT INTO silver_spotrac_salaries (player_name, team, year, position, "dead cap")
