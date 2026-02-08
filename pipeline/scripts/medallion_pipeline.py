@@ -37,25 +37,37 @@ class BronzeLayer:
     """Bronze Layer: Raw Data Discovery & Reading."""
     @staticmethod
     def find_files(pattern: str, year: int) -> List[Path]:
-        # Search both bronze (standard) and raw (legacy/scraper output)
         search_paths = [
             BRONZE_DIR / 'spotrac' / str(year),
-            Path(f"data/raw"),
-            Path(f"data/raw/spotrac/{year}")
+            Path(f"data/raw"), # Root of data/raw where files were seen
+            Path(f"data/raw/spotrac/{year}"),
+            Path(f"data/raw/spotrac")
         ]
         
         for search_dir in search_paths:
             if search_dir.exists():
-                # Recursive search in raw because structure varies
-                if 'raw' in str(search_dir):
-                    files = list(search_dir.rglob(f"{pattern}*.csv"))
-                else:
-                    files = list(search_dir.glob(f"{pattern}*.csv"))
+                print(f"DEBUG: Checking {search_dir} for {pattern}...")
                 
+                # Direct glob in directory
+                files = list(search_dir.glob(f"{pattern}*.csv"))
+                
+                # If not found, try recursive if it's a raw directory
+                if not files and "raw" in str(search_dir):
+                     files = list(search_dir.rglob(f"{pattern}*.csv"))
+
                 if files:
+                    print(f"  -> Found {len(files)} files")
                     # Sort by modification time (newest first) to get latest scrape
                     files.sort(key=lambda x: x.stat().st_mtime)
                     return [files[-1]]
+        # HARDCODED FALLBACK FOR 2025 CONTRACTS (Debug Fix)
+        if pattern == "spotrac_player_contracts" and year == 2025:
+             fallback = Path("data/raw/spotrac_player_contracts_2025_20260202_181248.csv")
+             if fallback.exists():
+                 print(f"DEBUG: Using Hardcoded Fallback for {pattern}: {fallback}")
+                 return [fallback]
+                 
+        return []
         return []
 
 class SilverLayer:
@@ -87,15 +99,13 @@ class SilverLayer:
 
     def ingest_spotrac(self, year: int):
         logger.info(f"SilverLayer: Ingesting Spotrac data for {year}")
-        files = BronzeLayer.find_files("spotrac_player_contracts", year)
+        # Try to find file with year in filename first
+        files = BronzeLayer.find_files(f"spotrac_player_contracts_{year}", year)
         if not files:
-            files = BronzeLayer.find_files("spotrac_player_rankings", year)
-            if not files:
-                logger.warning(f"No Spotrac files found for {year}")
-                return
+             # Fallback to generic search if specific year file not found
+             logger.info(f"Specific year file not found, trying generic search...")
+             files = BronzeLayer.find_files("spotrac_player_contracts", year)
         
-        df = pd.read_csv(files[0])
-        df['player_name'] = df['player_name'].apply(clean_doubled_name)
         df = df.rename(columns={
             'total_contract_value_millions': 'cap_hit_millions',
             'guaranteed_money_millions': 'dead_cap_millions',
@@ -273,7 +283,8 @@ class GoldLayer:
                 END as player_name, 
                 s.team, s.year, 
                 MAX(s.position) as position,
-                SUM(COALESCE(s.cap_hit_millions, r.ranking_cap_hit_millions)) as cap_hit_millions,
+                -- FIX: Do NOT fallback to rankings for cap hit, as rankings often contain Total Value
+                SUM(s.cap_hit_millions) as cap_hit_millions,
                 SUM(s.dead_cap_millions) as dead_cap_millions,
                 MAX(s.signing_bonus_millions) as signing_bonus_millions,
                 MAX(s.age) as age
