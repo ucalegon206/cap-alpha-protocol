@@ -35,23 +35,23 @@ jobs:
     - name: Create Data Directory
       run: mkdir -p data/duckdb
 
-    - name: Run Data Pipeline
-      run: |
-        export PYTHONPATH=$PYTHONPATH:pipeline
-        # Run ingestion and validation
-        python pipeline/run_pipeline.py --skip-training --skip-audits
+    # - name: Run Data Pipeline
+    #   run: |
+    #     export PYTHONPATH=$PYTHONPATH:pipeline
+    #     # Run ingestion and validation
+    #     python pipeline/run_pipeline.py --skip-training --skip-audits
 
-    - name: Run dbt Transformations (Production)
-      run: |
-        cd dbt
-        dbt deps --profiles-dir .
-        dbt run --target prod --profiles-dir .
-        dbt test --target prod --profiles-dir .
+    # - name: Run dbt Transformations (Production)
+    #   run: |
+    #     cd dbt
+    #     dbt deps --profiles-dir .
+    #     dbt run --target prod --profiles-dir .
+    #     dbt test --target prod --profiles-dir .
 
-    - name: Sync to MotherDuck
-      run: |
-        export PYTHONPATH=$PYTHONPATH:pipeline
-        python pipeline/scripts/sync_to_motherduck.py
+    # - name: Sync to MotherDuck
+    #   run: |
+    #     export PYTHONPATH=$PYTHONPATH:pipeline
+    #     python pipeline/scripts/sync_to_motherduck.py
 
     - name: Verification
-      run: echo "Deployment Pipeline Completed Successfully"
+      run: echo "Deployment Pipeline Skipped (Using Committed JSON Artifact)"
