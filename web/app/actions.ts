@@ -53,7 +53,8 @@ function generateMockFinancials(player: any): PlayerEfficiency {
 
 async function getHydratedData(): Promise<PlayerEfficiency[]> {
   try {
-    // UPDATED: Read from local 'data' directory for Vercel deployment compatibility
+    // UPDATED: Read from internal 'web/data' directory for Vercel deployment compatibility
+    // Vercel only bundles files inside the project root (web/)
     const filePath = path.resolve(process.cwd(), 'data/roster_dump.json');
 
     let rawData: any[] = [];
