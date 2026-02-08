@@ -52,11 +52,16 @@ def export_roster_json():
     if df.empty:
         logger.warning("No data found for 2025! JSON dump will be empty.")
     
+    # CRITICAL: Sanitize NaN/Inf values before JSON export.
+    # Python's json.dump outputs 'NaN' for float NaN, which is INVALID JSON
+    # and will break webpack, browsers, and any downstream consumer.
+    numeric_cols = df.select_dtypes(include=['float64', 'float32']).columns
+    df[numeric_cols] = df[numeric_cols].fillna(0).replace([float('inf'), float('-inf')], 0)
+    
     # Convert to list of dicts
     data = df.to_dict(orient='records')
     
     # Write to JSON
-    # Ensure directory exists just in case (though data/ usually exists)
     EXPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     
     with open(EXPORT_PATH, 'w') as f:
