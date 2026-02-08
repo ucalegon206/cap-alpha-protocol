@@ -104,7 +104,23 @@ class SilverLayer:
         if not files:
              # Fallback to generic search if specific year file not found
              logger.info(f"Specific year file not found, trying generic search...")
-             files = BronzeLayer.find_files("spotrac_player_contracts", year)
+        if files:
+            logger.info(f"Loading Spotrac Contracts from: {files[0]}")
+            df = pd.read_csv(files[0])
+        else:
+            files = BronzeLayer.find_files("spotrac_player_rankings", year)
+            if not files:
+                logger.warning(f"No Spotrac files found for {year}")
+                return
+
+            df = pd.read_csv(files[0])
+        
+        df['player_name'] = df['player_name'].apply(clean_doubled_name)
+        
+        # Check if total_contract_value_millions exists
+        if 'total_contract_value_millions' in df.columns and 'cap_hit_millions' in df.columns:
+             logger.info("DEBUG: 'cap_hit_millions' already exists. Dropping 'total_contract_value_millions' to avoid overwrite.")
+             df = df.drop(columns=['total_contract_value_millions'])
         
         df = df.rename(columns={
             'total_contract_value_millions': 'cap_hit_millions',
