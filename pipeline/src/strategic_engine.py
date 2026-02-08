@@ -26,7 +26,7 @@ class StrategicEngine:
                 SELECT 
                     f.team,
                     AVG(p.predicted_risk_score) as avg_risk,
-                    AVG(f.value_metric_proxy) as avg_efficiency,
+                    AVG(f.fair_market_value) as avg_efficiency,
                     SUM(f.cap_hit_millions) as total_cap,
                     SUM(p.predicted_risk_score * f.cap_hit_millions) as total_weighted_risk,
                     COUNT(*) as roster_size

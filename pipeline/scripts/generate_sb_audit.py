@@ -4,14 +4,15 @@ import pandas as pd
 import logging
 from pathlib import Path
 
+from src.config_loader import get_db_path
+
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_belichick.db"
 REPORT_PATH = Path("reports/super_bowl_lx_risk_audit.md")
 
 def generate_sb_audit():
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
     
     # Target teams for SB LX
     teams = ['SEA', 'NE']

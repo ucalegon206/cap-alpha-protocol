@@ -1,0 +1,67 @@
+
+# Version Control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+
+# Data & Notebooks
+data/
+data_raw_DEPRECATED/
+data_processed_DEPRECATED/
+notebooks/
+.ipynb_checkpoints
+
+# Environment & Secrets
+.env
+.env.*
+*.pem
+
+# Dependencies
+node_modules/
+
+# OS Specific generated files - CAUSING BUILD ISSUES
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Misc
+reports/
+outputs/
+logs/
+numpy_fix/
+nfl_external_venv/
+integration_venv/
+test_venv/
+bridge_venv/
+test_dir/
+security_test/
+*.pkl

@@ -1,11 +1,14 @@
 import { getRosterData, getTeamCapSummary } from "./actions";
 import { RosterGrid } from "@/components/roster-grid";
+import { EfficiencyLandscape } from "@/components/efficiency-landscape";
+import { RosterCard } from "@/components/roster-card";
 import { TradeMachine } from "@/components/trade-machine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function Home() {
+    // Get Data (hydrated from JSON with Mock Fallback if needed)
     const rosterData = await getRosterData();
     const teamSummary = await getTeamCapSummary();
 
@@ -14,7 +17,8 @@ export default async function Home() {
     const activePlayers = rosterData.length;
 
     return (
-        <main className="min-h-screen bg-background p-8 font-sans text-foreground">
+        // Fix: Use 100dvh for mobile viewport consistency
+        <main className="min-h-[100dvh] bg-background p-8 font-sans text-foreground">
 
             {/* Header: The War Room */}
             <header className="mb-8 flex items-center justify-between border-b border-border pb-4">
@@ -83,14 +87,35 @@ export default async function Home() {
                 </Card>
             </div>
 
+            {/* HERO: EFFICIENCY LANDSCAPE */}
+            <section className="mb-8">
+                {/* @ts-ignore */}
+                <EfficiencyLandscape data={rosterData} />
+            </section>
+
             {/* Main Content: Tabs */}
             <Tabs defaultValue="portfolio" className="space-y-4">
                 <TabsList className="bg-secondary/50 p-1">
                     <TabsTrigger value="portfolio" className="px-8 font-mono uppercase">Portfolio Library</TabsTrigger>
+                    <TabsTrigger value="grid" className="px-8 font-mono uppercase">Data Grid</TabsTrigger>
                     <TabsTrigger value="trade" className="px-8 font-mono uppercase">The War Room (Trade)</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="portfolio" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {rosterData.slice(0, 24).map((player: any) => (
+                            // @ts-ignore
+                            <RosterCard key={`${player.player_name}-${player.team}`} player={player} />
+                        ))}
+                    </div>
+                    {rosterData.length > 24 && (
+                        <div className="text-center mt-4">
+                            <Badge variant="outline">Showing Top 24 of {rosterData.length} Assets</Badge>
+                        </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="grid" className="space-y-4">
                     <Card className="bg-card border-border">
                         <CardContent className="p-0">
                             <RosterGrid data={rosterData} />
@@ -106,3 +131,4 @@ export default async function Home() {
         </main>
     );
 }
+

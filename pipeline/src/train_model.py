@@ -30,40 +30,46 @@ logger = logging.getLogger(__name__)
 from src.config_loader import get_db_path
 
 DB_PATH = get_db_path()
-MODEL_DIR = Path("/tmp/models")
+MODEL_DIR = Path(os.getenv("MODEL_DIR", "/tmp/models"))
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 class RiskModeler:
     def __init__(self, db_path=DB_PATH, read_only=False):
+        self.db_path = db_path
+        self.read_only = read_only
         self.db = DBManager(db_path)
         self.con = self.db.con
 
     def prepare_data(self, target_col='edce_risk'):
-        logger.info(f"Loading feature matrix from FEATURE STORE...")
+        logger.info(f"Loading feature matrix from staging_feature_matrix...")
         
-        # Initialize store
-        store = FeatureStore(db_path=self.db_path, read_only=self.read_only)
-        
-        # Get historical features (diagonal join)
-        # Using 2015-2025 range
-        df_features = store.get_historical_features(min_year=2015, max_year=2025)
-        
-        if df_features.empty:
-            raise ValueError("Feature store returned empty dataframe. Run materialize_features.py first.")
-            
-        # Get Target and Metadata from staging (or re-derive)
-        logger.info("Loading targets and metadata...")
-        df_targets = self.con.execute(f"""
-            SELECT player_name, year, team, {target_col}
-            FROM fact_player_efficiency
+        # Direct read from staging (bypass FeatureStore for now as FeatureFactory populates staging)
+        df = self.con.execute(f"""
+            SELECT * FROM staging_feature_matrix 
             WHERE year BETWEEN 2015 AND 2025
         """).df()
         
-        # Merge Features and Targets
-        df = pd.merge(df_targets, df_features, on=['player_name', 'year'], how='inner')
+        if df.empty:
+            raise ValueError("Staging feature matrix is empty. Run Feature Factory first.")
+            
+        # Target is already in the matrix (passed through from Gold Layer)
+        if target_col not in df.columns:
+             # Fallback: Try to join from fact_player_efficiency if missing
+             logger.warning(f"Target {target_col} not in matrix. Joining from Gold Layer...")
+             df_target = self.con.execute(f"SELECT player_name, year, {target_col} FROM fact_player_efficiency").df()
+             df = pd.merge(df, df_target, on=['player_name', 'year'], how='inner')
+
+        # Merge handled implicitly or above
         
         # 1. Split into features and target
-        skip_cols = ['player_name', 'year', 'team', target_col]
+        # LEAKAGE PREVENTION: Drop columns that define average/risk directly
+        skip_cols = [
+            'player_name', 'year', 'team', target_col, 
+            'potential_dead_cap_millions',
+            'dead_cap_millions', 
+            'signing_bonus_millions',
+            'salaries_dead_cap_millions'
+        ]
         X = df.drop(columns=[c for c in skip_cols if c in df.columns])
         
         # Robust numeric conversion
@@ -147,7 +153,7 @@ class RiskModeler:
         if self.db.db_path and "read_only" in self.db.db_path: # Simulated read_only check for manager
              logger.info("Database is read-only. Skipping persistence to 'prediction_results' table.")
         else:
-            self.con.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata", {"metadata": metadata})
+            self.db.execute("CREATE OR REPLACE TABLE prediction_results AS SELECT * FROM metadata", {"metadata": metadata})
             logger.info("✓ Predictions persisted to 'prediction_results' table.")
         
         # 2. Save Model Artifact
@@ -211,7 +217,7 @@ class RiskModeler:
             if self.read_only:
                 logger.info("Database is read-only. Skipping persistence to 'prediction_explanations' table.")
             else:
-                self.con.execute("CREATE OR REPLACE TABLE prediction_explanations AS SELECT player_name, year, top_factors, all_factors FROM metadata_copy", {"metadata_copy": metadata_copy})
+                self.db.execute("CREATE OR REPLACE TABLE prediction_explanations AS SELECT player_name, year, top_factors, all_factors FROM metadata_copy", {"metadata_copy": metadata_copy})
                 logger.info("✓ Explanations persisted to 'prediction_explanations' (Top 3 + Full JSON).")
             
         except Exception as e:

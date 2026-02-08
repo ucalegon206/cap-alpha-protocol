@@ -52,21 +52,26 @@ class SilverLayer:
         self.db = db
 
     def provision_schemas(self):
-        logger.info("Provisioning Silver Layer schemas...")
-        schemas = [
-            "CREATE TABLE IF NOT EXISTS silver_pfr_game_logs (player_name VARCHAR, team VARCHAR, year INTEGER, game_url VARCHAR, Passing_Yds VARCHAR, Rushing_Yds VARCHAR, Receiving_Yds VARCHAR, Passing_TD VARCHAR, Rushing_TD VARCHAR, Receiving_TD VARCHAR)",
-            "CREATE TABLE IF NOT EXISTS silver_penalties (player_name_short VARCHAR, team VARCHAR, year INTEGER, penalty_count INTEGER, penalty_yards INTEGER)",
-            "CREATE TABLE IF NOT EXISTS silver_spotrac_contracts (player_name VARCHAR, team VARCHAR, year INTEGER, position VARCHAR, cap_hit_millions FLOAT, dead_cap_millions FLOAT, signing_bonus_millions FLOAT, age INTEGER)",
-            "CREATE TABLE IF NOT EXISTS silver_spotrac_rankings (player_name VARCHAR, year INTEGER, ranking_cap_hit_millions FLOAT)",
-            "CREATE TABLE IF NOT EXISTS silver_team_cap (team VARCHAR, year INTEGER, win_pct FLOAT)",
-            "CREATE TABLE IF NOT EXISTS silver_player_metadata (full_name VARCHAR, birth_date VARCHAR, college VARCHAR, draft_round INTEGER, draft_pick INTEGER, experience_years INTEGER)",
-            "CREATE TABLE IF NOT EXISTS silver_player_merch (Player VARCHAR, Rank INTEGER)",
-            "CREATE TABLE IF NOT EXISTS silver_team_finance (Team VARCHAR, Year INTEGER, Revenue_M FLOAT, OperatingIncome_M FLOAT)",
-            "CREATE TABLE IF NOT EXISTS silver_spotrac_salaries (player_name VARCHAR, team VARCHAR, year INTEGER, \"dead cap\" VARCHAR)",
-            "CREATE TABLE IF NOT EXISTS silver_pfr_draft_history (player_name VARCHAR, team VARCHAR, year INTEGER, draft_round INTEGER, draft_pick INTEGER)"
-        ]
-        for sql in schemas:
-            self.db.execute(sql)
+        logger.info("Provisioning Silver Layer schemas from contracts...")
+        schema_path = Path(__file__).parent.parent.parent / "contracts" / "schema.sql"
+        if not schema_path.exists():
+            # Fallback for Docker if mounted differently or during build
+             schema_path = Path("/app/contracts/schema.sql")
+        
+        if not schema_path.exists():
+            raise FileNotFoundError(f"Schema contract not found at {schema_path}")
+
+        with open(schema_path, "r") as f:
+            sql_content = f.read()
+            
+        # Split by semicolon to execute one by one, skipping empty lines
+        statements = [s.strip() for s in sql_content.split(";") if s.strip()]
+        
+        for sql in statements:
+            try:
+                self.db.execute(sql)
+            except Exception as e:
+                logger.warning(f"Failed to execute schema statement: {e}. Statement: {sql[:50]}...")
 
     def ingest_spotrac(self, year: int):
         logger.info(f"SilverLayer: Ingesting Spotrac data for {year}")
@@ -89,7 +94,10 @@ class SilverLayer:
             if col not in df.columns: df[col] = None
 
         self.db.execute(f"DELETE FROM silver_spotrac_contracts WHERE year = {year}")
-        self.db.execute("INSERT INTO silver_spotrac_contracts BY NAME SELECT DISTINCT * FROM df", {"df": df})
+        self.db.execute("""
+            INSERT INTO silver_spotrac_contracts (player_name, team, year, position, cap_hit_millions, dead_cap_millions, signing_bonus_millions, age)
+            SELECT player_name, team, year, position, cap_hit_millions, dead_cap_millions, signing_bonus_millions, age FROM df
+        """, {"df": df})
 
         # Salaries
         sal_files = BronzeLayer.find_files("spotrac_player_salaries", year)
@@ -97,8 +105,25 @@ class SilverLayer:
             df_sal = pd.read_csv(sal_files[0])
             if 'player_name' in df_sal.columns:
                 df_sal['player_name'] = df_sal['player_name'].apply(clean_doubled_name)
+            # Normalize columns to match schema
+            col_map = {
+                "dead_money_millions": "dead cap",
+                "Dead Cap": "dead cap",
+                "DeadCap": "dead cap",
+                "dead_cap": "dead cap"
+            }
+            df_sal = df_sal.rename(columns=col_map)
+            
+            # Ensure "dead cap" column exists, fill with 0/None if missing
+            if "dead cap" not in df_sal.columns:
+                 logger.warning(f"Could not find 'dead cap' column in Spotrac Salaries {year}. Columns: {df_sal.columns.tolist()}")
+                 df_sal["dead cap"] = "0"
+
             self.db.execute(f"DELETE FROM silver_spotrac_salaries WHERE year = {year}")
-            self.db.execute("INSERT INTO silver_spotrac_salaries BY NAME SELECT * FROM df_sal", {"df_sal": df_sal})
+            self.db.execute("""
+                INSERT INTO silver_spotrac_salaries (player_name, team, year, position, "dead cap")
+                SELECT player_name, team, year, position, "dead cap" FROM df_sal
+            """, {"df_sal": df_sal})
 
     def ingest_pfr(self, year: int):
         logger.info(f"SilverLayer: Ingesting PFR data for {year}")
@@ -121,7 +146,10 @@ class SilverLayer:
             df = df.rename(columns={tm_col: 'team'})
 
         self.db.execute(f"DELETE FROM silver_pfr_game_logs WHERE year = {year}")
-        self.db.execute("INSERT INTO silver_pfr_game_logs BY NAME SELECT * FROM df", {"df": df})
+        self.db.execute("""
+            INSERT INTO silver_pfr_game_logs (player_name, team, year, game_url, Passing_Yds, Rushing_Yds, Receiving_Yds, Passing_TD, Rushing_TD, Receiving_TD)
+            SELECT player_name, team, year, game_url, Passing_Yds, Rushing_Yds, Receiving_Yds, Passing_TD, Rushing_TD, Receiving_TD FROM df
+        """, {"df": df})
 
     def ingest_penalties(self, year: int):
         logger.info(f"SilverLayer: Ingesting Penalties for {year}")
@@ -142,7 +170,11 @@ class SilverLayer:
         df['team'] = df['team_city'].map(city_map)
         
         self.db.execute(f"DELETE FROM silver_penalties WHERE year = {year}")
-        self.db.execute("INSERT INTO silver_penalties BY NAME SELECT * FROM df", {"df": df})
+        # Explicitly select schema columns to avoid binder errors on extra columns
+        self.db.execute("""
+            INSERT INTO silver_penalties (player_name_short, team, year, penalty_count, penalty_yards)
+            SELECT player_name_short, team, year, penalty_count, penalty_yards FROM df
+        """, {"df": df})
 
     def ingest_team_cap(self):
         logger.info("SilverLayer: Ingesting Team Cap data")
@@ -168,6 +200,14 @@ class SilverLayer:
         if draft_file.exists():
              df_draft = pd.read_csv(draft_file)
              self.db.execute("CREATE OR REPLACE TABLE silver_pfr_draft_history AS SELECT * FROM df_draft", {"df_draft": df_draft})
+             
+    def ingest_player_metadata(self):
+        logger.info("SilverLayer: Ingesting player metadata")
+        meta_file = Path("data/raw/player_metadata.csv")
+        if meta_file.exists():
+            df_meta = pd.read_csv(meta_file)
+            # Normalize column names if needed, assume match for now
+            self.db.execute("CREATE OR REPLACE TABLE silver_player_metadata AS SELECT * FROM df_meta", {"df_meta": df_meta})
 
 class GoldLayer:
     """Gold Layer: Aggregating into Feature-Rich Analytics Tables."""
@@ -228,6 +268,9 @@ class GoldLayer:
             FROM silver_spotrac_salaries
             GROUP BY 1, 2, 3
         ),
+        player_meta AS (
+            SELECT * FROM silver_player_metadata
+        ),
         fact_long_fallback AS (
             SELECT 
                 s.*,
@@ -238,16 +281,22 @@ class GoldLayer:
                 COALESCE(p.total_rec_yds, 0) as total_rec_yds,
                 COALESCE(p.total_tds, 0) as total_tds,
                 COALESCE(pen.total_penalty_count, 0) as total_penalty_count,
-                COALESCE(pen.total_penalty_yards, 0) as total_penalty_yards
+                COALESCE(pen.total_penalty_yards, 0) as total_penalty_yards,
+                m.college,
+                m.draft_round,
+                m.draft_pick,
+                m.experience_years
             FROM dedup_contracts s
             LEFT JOIN pfr_agg p ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(p.player_name AS VARCHAR))) 
                 AND s.year = p.year AND s.team = p.team
             LEFT JOIN penalties_agg pen ON s.year = pen.year AND s.team = pen.team
                 AND (LOWER(s.player_name) LIKE LOWER(LEFT(pen.player_name_short, 1)) || '%' AND LOWER(s.player_name) LIKE '%' || LOWER(SUBSTRING(pen.player_name_short, 3)))
+            LEFT JOIN player_meta m ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(m.full_name AS VARCHAR)))
         )
         SELECT 
             f.*,
             GREATEST(COALESCE(sdc.salaries_dead_cap_millions, 0), f.dead_cap_millions, COALESCE(f.signing_bonus_millions, 0) * 2.0) as potential_dead_cap_millions,
+            GREATEST(COALESCE(sdc.salaries_dead_cap_millions, 0), f.dead_cap_millions, COALESCE(f.signing_bonus_millions, 0) * 2.0) as edce_risk,
             ( (COALESCE(f.total_tds,0) * 2.0 + (COALESCE(f.total_pass_yds,0) + COALESCE(f.total_rush_yds,0) + COALESCE(f.total_rec_yds,0)) / 100.0) * 1.8 
               - (COALESCE(f.total_penalty_yards,0) / 10.0) ) as fair_market_value
         FROM fact_long_fallback f
@@ -273,18 +322,14 @@ def main():
             silver.ingest_pfr(args.year)
             silver.ingest_penalties(args.year)
             silver.ingest_team_cap()
+            silver.ingest_team_cap()
             silver.ingest_others()
+            silver.ingest_player_metadata()
 
         if not args.skip_gold or args.gold_only:
             gold.build_fact_player_efficiency()
-            
-            # ML Enrichment Trigger
-            try:
-                from src.inference import InferenceEngine
-                engine = InferenceEngine(db.db_path, model_dir="/tmp/models")
-                engine.enrich_gold_layer()
-            except Exception as e:
-                logger.warning(f"ML Enrichment failed: {e}")
+            # ML Enrichment is now decoupled and run via src/inference.py in the orchestration layer
+            # This avoids circular dependencies with FeatureFactory
 
 if __name__ == "__main__":
     main()

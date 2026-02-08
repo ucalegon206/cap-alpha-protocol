@@ -20,8 +20,12 @@ class InferenceEngine:
         prod_info = governance.get_production_model_info()
         
         if not prod_info:
-            logger.warning("No PRODUCTION model found in registry.")
-            return None
+            logger.warning("No PRODUCTION model found in registry. Checking for CANDIDATE...")
+            prod_info = governance.get_latest_candidate()
+            
+        if not prod_info:
+             logger.warning("No model found (Production or Candidate).")
+             return None
             
         model_path = Path(prod_info["path"])
         if not model_path.exists():
@@ -46,12 +50,16 @@ class InferenceEngine:
         from src.feature_store import FeatureStore
         
         # 1. Load Point-in-Time Features (As of TODAY)
-        store = FeatureStore(db_path=str(self.db_path))
+        # store = FeatureStore(db_path=str(self.db_path))
         # We want the latest known data for all active players
-        df_features = store.get_training_matrix(as_of_date=date.today(), min_year=2024)
+        # df_features = store.get_training_matrix(as_of_date=date.today(), min_year=2024)
         
+        # Direct read from staging (consistency with training)
+        with DBManager(str(self.db_path)) as db:
+             df_features = db.execute("SELECT * FROM staging_feature_matrix WHERE year >= 2024").df()
+
         if df_features.empty:
-            logger.warning("FeatureStore returned empty matrix. Ensure materialization has run.")
+            logger.warning("Feature matrix emtpy. Ensure materialization has run.")
             return
 
         model = self.get_latest_model()
@@ -61,7 +69,8 @@ class InferenceEngine:
 
         # 2. Align Features with Model
         from src.ml_governance import MLGovernance
-        governance = MLGovernance(str(self.db_path))
+        from src.ml_governance import MLGovernance
+        governance = MLGovernance()
         prod_info = governance.get_production_model_info()
         
         if prod_info and "feature_names" in prod_info:
@@ -101,7 +110,7 @@ class InferenceEngine:
             # We don't have 'fair_market_value' column in X_aligned unless it was a feature.
             # Let's just update risk score for now as that is the critical artifact.
             
-            db.execute("CREATE OR REPLACE TEMPORARY TABLE inference_results AS SELECT * FROM updates_df")
+            db.execute("CREATE OR REPLACE TEMPORARY TABLE inference_results AS SELECT * FROM updates_df", {"updates_df": updates_df})
             
             # Add column if missing
             db.execute("ALTER TABLE fact_player_efficiency ADD COLUMN IF NOT EXISTS ml_risk_score DOUBLE")

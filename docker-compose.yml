@@ -1,10 +1,31 @@
 services:
   scraper:
-    build: .
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
     volumes:
-      - .:/app
-    # shm_size is important for Chrome to avoid crashing on memory constrained environments
-    shm_size: '2gb' 
+      - ./pipeline:/app
+      - ./data:/app/data
+      - ./contracts:/app/contracts
     environment:
       - PYTHONPATH=/app
+      - DB_PATH=/app/data/duckdb/nfl_production.db
     command: tail -f /dev/null # Keep alive for exec
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    volumes:
+      - ./pipeline:/app
+      - ./data:/app/data
+      - ./contracts:/app/contracts
+      - nfl_models_vol:/app/models # Maps /app/models to a Docker volume (bypassing host .pkl block)
+    environment:
+      - PYTHONPATH=/app
+      - MODEL_DIR=/app/models
+      - DB_PATH=/app/data/duckdb/nfl_production.db
+    command: tail -f /dev/null # Keep alive for exec
+
+volumes:
+  nfl_models_vol:

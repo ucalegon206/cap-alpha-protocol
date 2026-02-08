@@ -154,3 +154,17 @@ All tests are implemented in `src/data_quality_tests.py`:
 ---
 
 **Conclusion:** Dataset is production-ready for roster analysis. To enable dead money analysis, merge real contract data from Spotrac/OTC.
+
+---
+
+## Feb 8, 2026 Status Update (Post-Deployment)
+
+### Salary Data Hydration
+*   **Status:** ✅ RESOLVED
+*   **Source:** Spotrac & PFR (Synthesized via `fact_player_efficiency`)
+*   **Coverage:** ~2,538 active records for 2025 season (Live in `web/data/roster_dump.json`)
+
+### Model Performance (R2 Score)
+*   **High Cap (>$2M):** -3.35 (Needs immediate retraining)
+*   **Low Cap (<= $2M):** 0.003 (Baseline performance)
+*   **Action:** Deployment proceeded with strict data contract enforcement (`PlayerEfficiencySchema`) to ensure UI stability despite model volatility.

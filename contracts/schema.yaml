@@ -1,0 +1,124 @@
+# NFL Cap Alpha Protocol Data Contract
+# Version: 1.0.0
+# Source of Truth for Pipeline (DuckDB) and Web (TypeScript)
+
+tables:
+  silver_pfr_game_logs:
+    description: "Raw game logs from Pro-Football-Reference"
+    columns:
+      player_name: { type: "VARCHAR", description: "Player active name" }
+      team: { type: "VARCHAR", description: "Team abbreviation" }
+      year: { type: "INTEGER", description: "Season year" }
+      game_url: { type: "VARCHAR", description: "Unique URL per game" }
+      Passing_Yds: { type: "VARCHAR", description: "Passing Yards (raw)" }
+      Rushing_Yds: { type: "VARCHAR", description: "Rushing Yards (raw)" }
+      Receiving_Yds: { type: "VARCHAR", description: "Receiving Yards (raw)" }
+      Passing_TD: { type: "VARCHAR", description: "Passing Touchdowns (raw)" }
+      Rushing_TD: { type: "VARCHAR", description: "Rushing Touchdowns (raw)" }
+      Receiving_TD: { type: "VARCHAR", description: "Receiving Touchdowns (raw)" }
+
+  silver_penalties:
+    description: "Player penalty statistics"
+    columns:
+      player_name_short: { type: "VARCHAR", description: "Short name (e.g. T.Brady)" }
+      team: { type: "VARCHAR", description: "Team abbreviation" }
+      year: { type: "INTEGER", description: "Season year" }
+      penalty_count: { type: "INTEGER", description: "Number of penalties" }
+      penalty_yards: { type: "INTEGER", description: "Yards lost to penalties" }
+
+  silver_spotrac_contracts:
+    description: "Contract data from Spotrac"
+    columns:
+      player_name: { type: "VARCHAR", description: "Player full name" }
+      team: { type: "VARCHAR", description: "Team abbreviation" }
+      year: { type: "INTEGER", description: "Season year" }
+      position: { type: "VARCHAR", description: "Player position" }
+      cap_hit_millions: { type: "FLOAT", description: "Cap hit in millions" }
+      dead_cap_millions: { type: "FLOAT", description: "Dead cap in millions" }
+      signing_bonus_millions: { type: "FLOAT", description: "Signing bonus in millions" }
+      age: { type: "INTEGER", description: "Player age" }
+
+  silver_spotrac_rankings:
+    description: "Positional ranking data"
+    columns:
+      player_name: { type: "VARCHAR", description: "Player full name" }
+      year: { type: "INTEGER", description: "Season year" }
+      ranking_cap_hit_millions: { type: "FLOAT", description: "Ranked cap hit" }
+
+  silver_team_cap:
+    description: "Team-level cap and performance data"
+    columns:
+      team: { type: "VARCHAR", description: "Team abbreviation" }
+      year: { type: "INTEGER", description: "Season year" }
+      win_pct: { type: "FLOAT", description: "Winning percentage" }
+
+  silver_player_metadata:
+    description: "Static player attributes"
+    columns:
+      full_name: { type: "VARCHAR", description: "Player full name" }
+      birth_date: { type: "VARCHAR", description: "DOB (YYYY-MM-DD)" }
+      college: { type: "VARCHAR", description: "College attended" }
+      draft_round: { type: "INTEGER", description: "Draft round" }
+      draft_pick: { type: "INTEGER", description: "Overall pick number" }
+      experience_years: { type: "INTEGER", description: "Years in league" }
+
+  silver_player_merch:
+    description: "NFLPA Merchandise sales rankings"
+    columns:
+      Player: { type: "VARCHAR", description: "Player name" }
+      Rank: { type: "INTEGER", description: "Sales rank" }
+
+  silver_team_finance:
+    description: "Forbes team valuation data"
+    columns:
+      Team: { type: "VARCHAR", description: "Team name/city" }
+      Year: { type: "INTEGER", description: "Fiscal year" }
+      Revenue_M: { type: "FLOAT", description: "Revenue in millions" }
+      OperatingIncome_M: { type: "FLOAT", description: "Operating income in millions" }
+
+  silver_spotrac_salaries:
+    description: "Salary breakdown"
+    columns:
+      player_name: { type: "VARCHAR", description: "Player name" }
+      team: { type: "VARCHAR", description: "Team abbreviation" }
+      year: { type: "INTEGER", description: "Season year" }
+      position: { type: "VARCHAR", description: "Player position" }
+      "dead cap": { type: "VARCHAR", description: "Raw dead cap string" }
+
+  silver_pfr_draft_history:
+    description: "Draft history data"
+    columns:
+      player_name: { type: "VARCHAR", description: "Player name" }
+      team: { type: "VARCHAR", description: "Drafting team" }
+      year: { type: "INTEGER", description: "Draft year" }
+      draft_round: { type: "INTEGER", description: "Round" }
+      draft_pick: { type: "INTEGER", description: "Pick" }
+
+  fact_player_efficiency:
+    description: "Gold Layer: Player Efficiency Analytics"
+    columns:
+      player_name: { type: "VARCHAR", description: "Player active name" }
+      team: { type: "VARCHAR", description: "Team abbreviation" }
+      year: { type: "INTEGER", description: "Season year" }
+      position: { type: "VARCHAR", description: "Primary position" }
+      position: { type: "VARCHAR", description: "Primary position" }
+      age: { type: "INTEGER", description: "Player age" }
+      college: { type: "VARCHAR", description: "College attended" }
+      draft_round: { type: "INTEGER", description: "Draft round" }
+      draft_pick: { type: "INTEGER", description: "Overall pick number" }
+      experience_years: { type: "INTEGER", description: "Years in league" }
+      games_played: { type: "INTEGER", description: "Games played count" }
+      availability_rating: { type: "FLOAT", description: "Availability score (0-1)" }
+      total_pass_yds: { type: "FLOAT", description: "Total passing yards" }
+      total_rush_yds: { type: "FLOAT", description: "Total rushing yards" }
+      total_rec_yds: { type: "FLOAT", description: "Total receiving yards" }
+      total_tds: { type: "INTEGER", description: "Total touchdowns" }
+      total_penalty_count: { type: "INTEGER", description: "Total penalties" }
+      total_penalty_yards: { type: "INTEGER", description: "Total penalty yards" }
+      cap_hit_millions: { type: "FLOAT", description: "Cap hit (M)" }
+      dead_cap_millions: { type: "FLOAT", description: "Dead cap (M)" }
+      signing_bonus_millions: { type: "FLOAT", description: "Signing bonus (M)" }
+      potential_dead_cap_millions: { type: "FLOAT", description: "Projected dead cap risk" }
+      edce_risk: { type: "FLOAT", description: "Target variable: Effective Dead Cap Exposure" }
+      fair_market_value: { type: "FLOAT", description: "Calculated FMV score" }
+      ml_risk_score: { type: "FLOAT", description: "ML-predicted risk score" }

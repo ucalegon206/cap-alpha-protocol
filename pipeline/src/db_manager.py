@@ -34,12 +34,20 @@ class DBManager:
     def execute(self, query: str, params: Optional[Dict[str, Any]] = None):
         """Executes a SQL query with explicit DataFrame registration for broad scope visibility."""
         try:
+            bind_params = params
             if params:
-                for name, value in params.items():
-                    if isinstance(value, pd.DataFrame):
-                        self.con.register(name, value)
-                return self.con.execute(query, params)
-            return self.con.execute(query)
+                # Separate DataFrames for registration from bind parameters
+                df_params = {k: v for k, v in params.items() if isinstance(v, pd.DataFrame)}
+                bind_params = {k: v for k, v in params.items() if not isinstance(v, pd.DataFrame)}
+                
+                for name, df in df_params.items():
+                    self.con.register(name, df)
+                
+                # If bind_params is empty, pass None to avoid issues if execute expects no params
+                if not bind_params:
+                    bind_params = None
+
+            return self.con.execute(query, bind_params)
         except Exception as e:
             logger.error(f"Query execution failed: {e}\nQuery: {query}")
             raise
@@ -47,12 +55,18 @@ class DBManager:
     def fetch_df(self, query: str, params: Optional[Dict[str, Any]] = None):
         """Executes a query and returns a Pandas DataFrame."""
         try:
+            bind_params = params
             if params:
-                for name, value in params.items():
-                    if isinstance(value, pd.DataFrame):
-                        self.con.register(name, value)
-                return self.con.execute(query, params).df()
-            return self.con.execute(query).df()
+                df_params = {k: v for k, v in params.items() if isinstance(v, pd.DataFrame)}
+                bind_params = {k: v for k, v in params.items() if not isinstance(v, pd.DataFrame)}
+                
+                for name, df in df_params.items():
+                    self.con.register(name, df)
+                
+                if not bind_params:
+                    bind_params = None
+
+            return self.con.execute(query, bind_params).df()
         except Exception as e:
             logger.error(f"Failed to fetch DataFrame: {e}")
             raise

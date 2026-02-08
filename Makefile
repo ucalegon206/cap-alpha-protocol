@@ -1,16 +1,18 @@
-.PHONY: build run shell test clean
+.PHONY: setup shell pipeline test clean
 
-IMAGE_NAME := nfl-dead-money
-TAG := latest
-
-build:
-	docker build -t $(IMAGE_NAME):$(TAG) .
-
-run:
-	docker run --rm -v $(PWD)/reports:/app/reports $(IMAGE_NAME):$(TAG)
+setup:
+	docker-compose build
 
 shell:
-	docker run --rm -it -v $(PWD)/reports:/app/reports $(IMAGE_NAME):$(TAG) /bin/bash
+	docker-compose run --rm pipeline /bin/bash
+
+# Run the full pipeline inside the container
+pipeline:
+	docker-compose run --rm pipeline python3 run_pipeline.py
+
+# Run tests inside the container
+test:
+	docker-compose run --rm pipeline pytest tests/
 
 clean:
-	docker rmi $(IMAGE_NAME):$(TAG)
+	docker-compose down -v

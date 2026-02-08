@@ -42,6 +42,7 @@ class FeatureStore:
     def __init__(self, db_path: str = DB_PATH, read_only: bool = False):
         self.db = DBManager(db_path)
         self.con = self.db.con
+        self.read_only = read_only
         
     def initialize_schema(self):
         """Create feature store tables if they don't exist."""

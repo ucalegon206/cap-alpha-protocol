@@ -4,14 +4,15 @@ import pandas as pd
 import logging
 from pathlib import Path
 
+from src.config_loader import get_db_path
+
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/nfl_belichick.db"
 REPORT_PATH = Path("reports/production_risk_intelligence_2025.md")
 
 def generate_world_class_report():
-    con = duckdb.connect(DB_PATH)
+    con = duckdb.connect(get_db_path())
     
     logger.info("Generating World-Class Production Intelligence Report...")
     
@@ -40,14 +41,14 @@ def generate_world_class_report():
     df_danger = con.execute(danger_query).df()
 
     # 3. Efficiency Gems (Low Risk, High Performance - Proxy)
-    # Using the value_metric_proxy we calculated in the Gold layer
+    # Using the fair_market_value we calculated in the Gold layer
     gems_query = """
         SELECT 
-            p.player_name, p.team, p.predicted_risk_score, f.value_metric_proxy, f.cap_hit_millions
+            p.player_name, p.team, p.predicted_risk_score, f.fair_market_value, f.cap_hit_millions
         FROM prediction_results p
         JOIN fact_player_efficiency f ON p.player_name = f.player_name AND p.year = f.year AND p.team = f.team
         WHERE p.year = 2025 AND p.predicted_risk_score < 0.2
-        ORDER BY f.value_metric_proxy DESC
+        ORDER BY f.fair_market_value DESC
         LIMIT 10
     """
     df_gems = con.execute(gems_query).df()
@@ -80,7 +81,7 @@ def generate_world_class_report():
         f.write("| Player | Team | Value Metric | Risk Score |\n")
         f.write("| :--- | :--- | :--- | :--- |\n")
         for _, row in df_gems.iterrows():
-            f.write(f"| {row['player_name']} | {row['team']} | **{row['value_metric_proxy']:.2f}** | {row['predicted_risk_score']:.3f} |\n")
+            f.write(f"| {row['player_name']} | {row['team']} | **{row['fair_market_value']:.2f}** | {row['predicted_risk_score']:.3f} |\n")
         f.write("\n````\n\n")
 
         f.write("## 🧬 Hyperscale Methodology\n")

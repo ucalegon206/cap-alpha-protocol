@@ -52,7 +52,7 @@ def validate_gold_layer():
         logger.warning(f"⚠️ WARNING: Unusual age range found: {ranges['min_age'].iloc[0]} to {ranges['max_age'].iloc[0]}")
     
     # 4. Schema Consistency
-    expected_cols = ['player_name', 'year', 'cap_hit_millions', 'edce_risk']
+    expected_cols = ['player_name', 'year', 'cap_hit_millions', 'ml_risk_score']
     actual_cols = con.execute("DESCRIBE fact_player_efficiency").df()['column_name'].tolist()
     missing_cols = [c for c in expected_cols if c not in actual_cols]
     if missing_cols:

@@ -2,6 +2,7 @@
 import subprocess
 import logging
 import sys
+import os
 from pathlib import Path
 from src.strategic_engine import StrategicEngine
 from src.config_loader import get_db_path
@@ -42,23 +43,18 @@ def main():
     else:
         logger.info("⏭️  Skipping Ingestion (Bronze Layer)")
     
-    # 2. Quality Gate (Silver/Gold Check)
-    if not args.skip_validation:
-        run_step("Data Validation", "scripts/validate_gold_layer.py")
-    else:
-        logger.info("⏭️  Skipping Validation (Quality Gate)")
-    
-    # 3. Feature Engineering (Gold Layer Construction)
+    # 2. Feature Engineering (Gold Layer Enrichment Preparation)
     if not args.skip_features:
         run_step("Feature Factory", "src/feature_factory.py")
     else:
-        logger.info("⏭️  Skipping Feature Engineering (Gold Layer)")
-    
-    # 4. Model Training & Risk Frontier (Production XGBoost)
+        logger.info("⏭️  Skipping Feature Engineering")
+        
+    # 3. Model Training (Retrain from new data)
+    # Train BEFORE enrichment to ensure a model exists for bootstrapping
     if not args.skip_training:
         run_step("Production Training", "src/train_model.py")
         
-        # 4.1 ML Red Team Evaluation & Promotion
+        # 3.1 ML Red Team Evaluation & Promotion
         logger.info("--- Starting Step: ML Red Team Validation ---")
         try:
             from src.ml_validator import RedTeamEvaluator
@@ -93,11 +89,22 @@ def main():
             logger.error(f"--- FAILED Step: ML red Team Validation ({e}) ---")
             # We don't exit here, just don't promote
     else:
-        logger.info("⏭️  Skipping Training & Validation (Model Layer)")
+        logger.info("⏭️  Skipping Training (Model Layer)")
+
+    # 4. Model Inference (Enrichment)
+    # This must run AFTER Feature Factory and Training
+    if not args.skip_training: 
+         run_step("Gold Layer Enrichment", "src/inference.py")
+    
+    # 5. Quality Gate (Silver/Gold Check)
+    if not args.skip_validation:
+        run_step("Data Validation", "scripts/validate_gold_layer.py")
+    else:
+        logger.info("⏭️  Skipping Validation (Quality Gate)")
     
     # 5. Pipeline Integrity Testing (Formal pytest)
     if not args.skip_tests:
-        run_step("Integrity Testing", "-m pytest tests/test_strategic_engine.py tests/test_data_integrity.py")
+        run_step("Integrity Testing", "-m pytest tests/test_gold_integrity.py")
     else:
         logger.info("⏭️  Skipping Tests (Integrity Layer)")
     
