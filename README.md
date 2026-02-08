@@ -1,17 +1,17 @@
-# NFL Dead Money: Cap Alpha Protocol
+# Cap Alpha Protocol (CAP)
 
-**Strategic Intelligence Engine for NFL Roster Asset Management**
+**Institutional-Grade Intelligence Engine for NFL Capital Velocity & Roster Optimization**
 
 > **Status**: Production (v2.0)
-> **Architecture**: Medallion (DuckDB) | Date-Based Feature Store
-> **Performance**: R2 = **0.91** (High Cap >$10M) | R2 = 0.51 (Mid Cap) | R2 = 0.03 (Low Cap)
+> **Architecture**: Medallion (DuckDB) | Temporal Feature Store
+> **Performance**: R² = **0.91** (High-Cap Portfolio Management)
 
 ## Overview
-This system is an **Agentic Decision Support System** designed to identify inefficiencies in the NFL salary market. It ingests 15 years of contract and performance data (2011-2025), reconstructs the state of the world at any historical point in time, and predicts "Efficiency-Adjusted Cap Risk" (EDCE Risk).
+The **Cap Alpha Protocol** is a quantitative auditing and predictive inference system designed to price **Second-Order Volatility** in the $20B NFL human capital market. By integrating 15 years of longitudinal contract and play-by-play data, the CAP identifies "Liquidity Traps"—inefficiencies where unforced errors (The Discipline Tax) and structural contract decay silently deplete franchise enterprise value.
 
-The engine is built on two core principles:
-1.  **Point-in-Time Correctness**: A strict Date-Based Feature Store (`valid_from`, `valid_until`) eliminates temporal leakage.
-2.  **High-Cap Focus**: The model is optimized for "Dynasty Assets" (Starters/Stars), where signal is high (R2=0.91), ignoring the noise of the "Churn" (Low Cap <$2M).
+Built for **Maximum Fidelity**, the protocol follows two architectural mandates:
+1.  **Temporal Integrity**: A strict Date-Based Feature Store (`valid_from`, `valid_until`) ensures zero temporal leakage across 41,000+ observations.
+2.  **Portfolio Segmentation**: Statistical focus on high-cap assets (Contracts > $10M) where signal-to-noise is highest (R²=0.91), providing actionable intelligence for franchise decision-makers.
 
 ## Key Components
 
@@ -62,3 +62,4 @@ The "Low Cap Chaos" hypothesis was confirmed. The model is highly predictive for
 | **High Cap (>$10M)** | 39,734 | **0.91** | **Trust Implicitly** |
 | Mid Cap ($2M-$10M) | 114,424 | **0.51** | Use as Signal |
 | Low Cap (<$2M) | 332,001 | 0.03 | **Ignore** |
+# Dummy

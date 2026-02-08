@@ -279,49 +279,41 @@ def ingest_team_cap():
     
     if dfs:
         df = pd.concat(dfs)
-        con.execute("CREATE OR REPLACE TABLE silver_team_cap AS SELECT * FROM df")
-        logger.info(f"✓ Loaded {len(df)} team-year records into silver_team_cap")
+        con.execute("CREATE OR REPLACE TABLE silver_team_cap AS SELECT DISTINCT * FROM df")
+        logger.info(f"✓ Loaded {len(df)} team-year records (deduplicated) into silver_team_cap")
     
     con.close()
 
+def provision_silver_schemas(con):
+    logger.info("Provisioning silver schemas to ensure pipeline stability...")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_pfr_game_logs (player_name VARCHAR, team VARCHAR, year INTEGER, game_url VARCHAR, Passing_Yds VARCHAR, Rushing_Yds VARCHAR, Receiving_Yds VARCHAR, Passing_TD VARCHAR, Rushing_TD VARCHAR, Receiving_TD VARCHAR)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_penalties (player_name_short VARCHAR, team VARCHAR, year INTEGER, penalty_count INTEGER, penalty_yards INTEGER)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_spotrac_contracts (player_name VARCHAR, team VARCHAR, year INTEGER, position VARCHAR, cap_hit_millions FLOAT, dead_cap_millions FLOAT, signing_bonus_millions FLOAT, age INTEGER)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_spotrac_rankings (player_name VARCHAR, year INTEGER, ranking_cap_hit_millions FLOAT)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_team_cap (team VARCHAR, year INTEGER, win_pct FLOAT)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_player_metadata (full_name VARCHAR, birth_date VARCHAR, college VARCHAR, draft_round INTEGER, draft_pick INTEGER, experience_years INTEGER)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_player_merch (Player VARCHAR, Rank INTEGER)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_team_finance (Team VARCHAR, Year INTEGER, Revenue_M FLOAT, OperatingIncome_M FLOAT)")
+    con.execute("CREATE TABLE IF NOT EXISTS silver_spotrac_salaries (player_name VARCHAR, team VARCHAR, year INTEGER, \"dead cap\" VARCHAR)")
+
 def create_gold_layer():
     con = duckdb.connect(DB_PATH)
+    
+    # Ensure tables exist before querying
+    provision_silver_schemas(con)
     
     # 6. PFR Draft History
     logger.info("ingesting PFR Draft History...")
     draft_file = Path("data/raw/pfr/draft_history.csv")
     if draft_file.exists():
+        # Ensure table exists first to avoid schema mismatch on replace
+        con.execute("CREATE TABLE IF NOT EXISTS silver_pfr_draft_history AS SELECT * FROM read_csv_auto('data/raw/pfr/draft_history.csv') LIMIT 0")
         con.execute("CREATE OR REPLACE TABLE silver_pfr_draft_history AS SELECT * FROM read_csv_auto('data/raw/pfr/draft_history.csv')")
         count = con.execute("SELECT COUNT(*) FROM silver_pfr_draft_history").fetchone()[0]
         logger.info(f"✓ Loaded {count} draft picks into silver_pfr_draft_history")
     else:
+        con.execute("CREATE TABLE IF NOT EXISTS silver_pfr_draft_history (player_name VARCHAR, team VARCHAR, year INTEGER, draft_round INTEGER, draft_pick INTEGER)")
         logger.warning("No draft history file found at data/raw/pfr/draft_history.csv")
-
-    # Hardened Metadata Provisioning
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS silver_player_metadata (
-            full_name VARCHAR,
-            birth_date VARCHAR,
-            college VARCHAR,
-            draft_round INTEGER,
-            draft_pick INTEGER,
-            experience_years INTEGER
-        )
-    """)
-    logger.info("✓ Provisioned baseline silver_player_metadata schema (Empty).")
-
-    # Provision optional tables that may not exist
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS silver_player_merch (
-            Player VARCHAR, Rank INTEGER
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS silver_team_finance (
-            Team VARCHAR, Year INTEGER, Revenue_M FLOAT, OperatingIncome_M FLOAT
-        )
-    """)
-    logger.info("✓ Provisioned optional stub tables (merch, finance).")
 
     logger.info("Building Gold Layer: fact_player_efficiency...")
     
@@ -362,7 +354,11 @@ def create_gold_layer():
             MAX(s.signing_bonus_millions) as signing_bonus_millions,
             MAX(s.age) as age
         FROM silver_spotrac_contracts s
-        LEFT JOIN silver_spotrac_rankings r 
+        LEFT JOIN (
+            SELECT player_name, year, MAX(ranking_cap_hit_millions) as ranking_cap_hit_millions 
+            FROM silver_spotrac_rankings 
+            GROUP BY 1, 2
+        ) r 
           ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(r.player_name AS VARCHAR)))
           AND s.year = r.year
         GROUP BY 1, 2, 3
@@ -448,8 +444,12 @@ def create_gold_layer():
         LEFT JOIN (
             SELECT Player, MIN(Rank) as Rank, MAX(51 - Rank) as popularity_score FROM silver_player_merch GROUP BY 1
         ) pm ON LOWER(TRIM(CAST(s.player_name AS VARCHAR))) = LOWER(TRIM(CAST(pm.Player AS VARCHAR)))
-        LEFT JOIN silver_team_finance tc ON LOWER(TRIM(CAST(s.team AS VARCHAR))) = LOWER(TRIM(CAST(tc.Team AS VARCHAR))) AND tc.Year = 2023
-        LEFT JOIN silver_team_cap stc ON s.team = stc.team AND s.year = stc.year
+        LEFT JOIN (
+            SELECT Team, MAX(Revenue_M) as Revenue_M, MAX(OperatingIncome_M) as OperatingIncome_M FROM silver_team_finance GROUP BY 1
+        ) tc ON LOWER(TRIM(CAST(s.team AS VARCHAR))) = LOWER(TRIM(CAST(tc.Team AS VARCHAR)))
+        LEFT JOIN (
+            SELECT team, year, MAX(win_pct) as win_pct FROM silver_team_cap GROUP BY 1, 2
+        ) stc ON s.team = stc.team AND s.year = stc.year
     )
     SELECT 
         f.player_name, f.team, f.position, f.year, f.cap_hit_millions,
@@ -490,7 +490,9 @@ def create_gold_layer():
     FROM fact_long_fallback f
     LEFT JOIN age_risk_theshold ar ON f.player_name = ar.player_name AND f.year = ar.year
     LEFT JOIN salary_dead_cap sdc ON LOWER(TRIM(CAST(f.player_name AS VARCHAR))) = LOWER(TRIM(CAST(sdc.player_name AS VARCHAR))) AND f.year = sdc.year AND LOWER(TRIM(CAST(f.team AS VARCHAR))) = LOWER(TRIM(CAST(sdc.team AS VARCHAR)))
-    LEFT JOIN silver_team_cap stc ON f.team = stc.team AND f.year = stc.year
+    LEFT JOIN (
+        SELECT team, year, MAX(win_pct) as win_pct FROM silver_team_cap GROUP BY 1, 2
+    ) stc ON f.team = stc.team AND f.year = stc.year
     """)
     
     logger.info("✓ Gold Layer created: fact_player_efficiency (Penalty-Aware)")
@@ -501,20 +503,25 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--year", type=int, help="Specific year to ingest (required)", required=True)
     parser.add_argument("--week", type=int, help="Specific week (optional)", default=None)
+    parser.add_argument("--skip-gold", action="store_true", help="Skip Gold Layer Building")
+    parser.add_argument("--gold-only", action="store_true", help="Only build Gold Layer")
     args = parser.parse_args()
 
-    ingest_spotrac(year=args.year, week=args.week)
-    ingest_pfr(year=args.year, week=args.week)
-    ingest_penalties(year=args.year)
-    ingest_financials()
-    ingest_team_cap()
-    create_gold_layer()
+    if not args.gold_only:
+        ingest_spotrac(year=args.year, week=args.week)
+        ingest_pfr(year=args.year, week=args.week)
+        ingest_penalties(year=args.year)
+        ingest_financials()
+        ingest_team_cap()
     
-    # NEW: Phase 2 Strategic Upgrade (ML Enrichment)
-    try:
-        from src.inference import InferenceEngine
-        # Provide both paths explicitly if needed, but the engine now searches fallback /tmp/models
-        engine = InferenceEngine(DB_PATH, model_dir="/tmp/models")
-        engine.enrich_gold_layer()
-    except Exception as e:
-        logger.warning(f"ML Enrichment failed: {e}. Falling back to heuristic baseline.")
+    if not args.skip_gold or args.gold_only:
+        create_gold_layer()
+        
+        # NEW: Phase 2 Strategic Upgrade (ML Enrichment)
+        try:
+            from src.inference import InferenceEngine
+            # Provide both paths explicitly if needed, but the engine now searches fallback /tmp/models
+            engine = InferenceEngine(DB_PATH, model_dir="/tmp/models")
+            engine.enrich_gold_layer()
+        except Exception as e:
+            logger.warning(f"ML Enrichment failed: {e}. Falling back to heuristic baseline.")

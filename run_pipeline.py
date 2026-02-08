@@ -35,7 +35,9 @@ def main():
     # 1. Ingestion & Normalization (Bronze/Silver)
     if not args.skip_ingest:
         for year in range(2011, 2026):
-             run_step(f"Ingestion {year}", f"scripts/ingest_to_duckdb.py --year {year}")
+             run_step(f"Ingestion {year}", f"scripts/ingest_to_duckdb.py --year {year} --skip-gold")
+        # Build Gold Layer once after all ingestion
+        run_step("Build Gold Layer", "scripts/ingest_to_duckdb.py --year 2025 --gold-only")
     else:
         logger.info("⏭️  Skipping Ingestion (Bronze Layer)")
     

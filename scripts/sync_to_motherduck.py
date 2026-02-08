@@ -17,6 +17,23 @@ def sync():
         logger.error(f"Local database not found at {local_db}")
         sys.exit(1)
 
+    # Sanity check: ensure local DB has data
+    try:
+        local_con = duckdb.connect(local_db)
+        tables = local_con.execute("SHOW TABLES").fetchall()
+        if not tables:
+            logger.error("Local database is empty. Aborting sync to prevent data loss in MotherDuck.")
+            local_con.close()
+            sys.exit(1)
+        # Check for important tables
+        table_names = [t[0] for t in tables]
+        if "fact_player_efficiency" not in table_names:
+             logger.warning("Gold layer table 'fact_player_efficiency' not found in local DB.")
+        local_con.close()
+    except Exception as e:
+        logger.error(f"Failed to verify local database: {e}")
+        sys.exit(1)
+
     try:
         logger.info(f"Connecting to MotherDuck...")
         # Connecting with the token
