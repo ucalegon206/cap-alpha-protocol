@@ -7,7 +7,14 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     make \
+    chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
+
+# Set Chrome environment variables
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_BIN=/usr/bin/chromium-driver
+ENV PYTHONUNBUFFERED=1
 
 # Copy requirements from pipeline dir
 COPY pipeline/requirements-frozen.txt .

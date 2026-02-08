@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from src.db_manager import DBManager
 from src.config_loader import get_db_path, get_bronze_dir
 from src.financial_ingestion import load_team_financials, load_player_merch
+from src.spotrac_scraper_v2 import scrape_and_save_player_contracts, scrape_and_save_player_rankings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,10 +39,7 @@ class BronzeLayer:
     @staticmethod
     def find_files(pattern: str, year: int) -> List[Path]:
         search_paths = [
-            BRONZE_DIR / 'spotrac' / str(year),
-            Path(f"data/raw"), # Root of data/raw where files were seen
-            Path(f"data/raw/spotrac/{year}"),
-            Path(f"data/raw/spotrac")
+            BRONZE_DIR / 'spotrac' / str(year)
         ]
         
         for search_dir in search_paths:
@@ -101,17 +99,39 @@ class SilverLayer:
         logger.info(f"SilverLayer: Ingesting Spotrac data for {year}")
         # Try to find file with year in filename first
         files = BronzeLayer.find_files(f"spotrac_player_contracts_{year}", year)
+        
+        if not files:
+             logger.info(f"Missing Spotrac Contracts for {year}. Initiating SCRAPE...")
+             try:
+                 output_dir = BRONZE_DIR / 'spotrac' / str(year)
+                 scrape_and_save_player_contracts(year, output_dir=output_dir)
+                 files = BronzeLayer.find_files(f"spotrac_player_contracts_{year}", year)
+             except Exception as e:
+                 logger.error(f"Scrape failed for contracts {year}: {e}")
+
         if not files:
              # Fallback to generic search if specific year file not found
              logger.info(f"Specific year file not found, trying generic search...")
              files = BronzeLayer.find_files("spotrac_player_contracts", year)
+        
         if files:
             logger.info(f"Loading Spotrac Contracts from: {files[0]}")
             df = pd.read_csv(files[0])
         else:
+            logger.info(f"Contracts file missing. Trying Rankings...")
             files = BronzeLayer.find_files("spotrac_player_rankings", year)
+            
             if not files:
-                logger.warning(f"No Spotrac files found for {year}")
+                logger.info(f"Missing Spotrac Rankings for {year}. Initiating SCRAPE...")
+                try:
+                    output_dir = BRONZE_DIR / 'spotrac' / str(year)
+                    scrape_and_save_player_rankings(year, output_dir=output_dir)
+                    files = BronzeLayer.find_files("spotrac_player_rankings", year)
+                except Exception as e:
+                     logger.error(f"Scrape failed for rankings {year}: {e}")
+
+            if not files:
+                logger.warning(f"No Spotrac files found for {year} even after scrape attempt.")
                 return
 
             df = pd.read_csv(files[0])
