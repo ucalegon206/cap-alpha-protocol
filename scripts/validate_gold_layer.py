@@ -1,4 +1,4 @@
-import duckdb
+from src.db_manager import DBManager
 import logging
 import sys
 import pandas as pd
@@ -15,7 +15,8 @@ DB_PATH = get_db_path()
 
 def validate_gold_layer():
     logger.info("--- Starting Gold Layer Validation ---")
-    con = duckdb.connect(DB_PATH)
+    db = DBManager(DB_PATH)
+    con = db.con
     
     # 1. Existence Checks
     tables = con.execute("SHOW TABLES").df()['name'].tolist()

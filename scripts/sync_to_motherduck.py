@@ -1,4 +1,4 @@
-import duckdb
+from src.db_manager import DBManager
 import os
 import sys
 import logging
@@ -19,17 +19,17 @@ def sync():
 
     # Sanity check: ensure local DB has data
     try:
-        local_con = duckdb.connect(local_db)
-        tables = local_con.execute("SHOW TABLES").fetchall()
+        local_db_manager = DBManager(local_db)
+        tables = local_db_manager.execute("SHOW TABLES").fetchall()
         if not tables:
             logger.error("Local database is empty. Aborting sync to prevent data loss in MotherDuck.")
-            local_con.close()
+            local_db_manager.close()
             sys.exit(1)
         # Check for important tables
         table_names = [t[0] for t in tables]
         if "fact_player_efficiency" not in table_names:
              logger.warning("Gold layer table 'fact_player_efficiency' not found in local DB.")
-        local_con.close()
+        local_db_manager.close()
     except Exception as e:
         logger.error(f"Failed to verify local database: {e}")
         sys.exit(1)
@@ -37,6 +37,7 @@ def sync():
     try:
         logger.info(f"Connecting to MotherDuck...")
         # Connecting with the token
+        import duckdb
         con = duckdb.connect(f"md:nfl_dead_money?motherduck_token={token}")
         
         logger.info(f"Pushing {local_db} to MotherDuck...")
