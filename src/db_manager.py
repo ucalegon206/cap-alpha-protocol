@@ -1,7 +1,8 @@
 import duckdb
 import os
 import logging
-from typing import Optional, Any
+import pandas as pd
+from typing import Optional, Any, Dict
 from src.config_loader import get_db_path
 
 logger = logging.getLogger(__name__)
@@ -30,20 +31,26 @@ class DBManager:
             logger.error(f"Failed to connect to database: {e}")
             raise
 
-    def execute(self, query: str, params: Optional[Any] = None):
-        """Executes a SQL query."""
+    def execute(self, query: str, params: Optional[Dict[str, Any]] = None):
+        """Executes a SQL query with explicit DataFrame registration for broad scope visibility."""
         try:
             if params:
+                for name, value in params.items():
+                    if isinstance(value, pd.DataFrame):
+                        self.con.register(name, value)
                 return self.con.execute(query, params)
             return self.con.execute(query)
         except Exception as e:
             logger.error(f"Query execution failed: {e}\nQuery: {query}")
             raise
 
-    def fetch_df(self, query: str, params: Optional[Any] = None):
+    def fetch_df(self, query: str, params: Optional[Dict[str, Any]] = None):
         """Executes a query and returns a Pandas DataFrame."""
         try:
             if params:
+                for name, value in params.items():
+                    if isinstance(value, pd.DataFrame):
+                        self.con.register(name, value)
                 return self.con.execute(query, params).df()
             return self.con.execute(query).df()
         except Exception as e:
