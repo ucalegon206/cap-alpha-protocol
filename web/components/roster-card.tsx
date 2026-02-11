@@ -20,7 +20,7 @@ export function RosterCard({ player }: RosterCardProps) {
     const isValue = player.surplus_value > player.cap_hit_millions;
 
     // Format currency
-    const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 1 }).format(n * 1000000);
+    const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n * 1000000);
 
     return (
         <Card className={cn(

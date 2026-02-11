@@ -4,7 +4,8 @@ import { useDroppable } from "@dnd-kit/core"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowRightLeft, X } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { ArrowRightLeft, X, Banknote } from "lucide-react"
 
 export function TradeSimulationZone({
     assetsA,
@@ -12,6 +13,7 @@ export function TradeSimulationZone({
     teamA,
     teamB,
     onRemoveAsset,
+    onToggleRestructure,
     onSimulate
 }: {
     assetsA: any[],
@@ -19,6 +21,7 @@ export function TradeSimulationZone({
     teamA: string,
     teamB: string,
     onRemoveAsset: (id: string, team: 'A' | 'B') => void,
+    onToggleRestructure?: (id: string, team: 'A' | 'B') => void,
     onSimulate: () => void
 }) {
     const { setNodeRef: setNodeRefA, isOver: isOverA } = useDroppable({
@@ -46,7 +49,21 @@ export function TradeSimulationZone({
                         <div key={asset.id} className="flex items-center justify-between p-2 bg-secondary rounded-md text-sm">
                             <span>{asset.name} ({asset.position})</span>
                             <div className="flex items-center gap-2">
-                                <span className="font-mono text-emerald-500">${asset.cap_hit_millions}M</span>
+                                {/* Restructure Toggle (Only for players with significant cap) */}
+                                {asset.type === 'player' && asset.cap_hit_millions > 2 && onToggleRestructure && (
+                                    <div className="flex items-center space-x-2 mr-2">
+                                        <Switch
+                                            id={`restructure-${asset.id}`}
+                                            checked={!!asset.isRestructured}
+                                            onChange={() => onToggleRestructure(asset.id, 'A')}
+                                            className={asset.isRestructured ? 'bg-emerald-500' : 'bg-input'}
+                                        />
+                                        {asset.isRestructured && <Banknote className="h-4 w-4 text-emerald-500 animate-pulse" />}
+                                    </div>
+                                )}
+                                <span className={`font-mono ${asset.isRestructured ? 'text-emerald-500 font-bold decoration-dashed' : 'text-emerald-500'}`}>
+                                    ${asset.cap_hit_millions}M
+                                </span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveAsset(asset.id, 'A')}>
                                     <X className="h-3 w-3" />
                                 </Button>
@@ -71,6 +88,18 @@ export function TradeSimulationZone({
                         <div key={asset.id} className="flex items-center justify-between p-2 bg-secondary rounded-md text-sm">
                             <span>{asset.name} ({asset.position})</span>
                             <div className="flex items-center gap-2">
+                                {/* Restructure Toggle */}
+                                {asset.type === 'player' && asset.cap_hit_millions > 2 && onToggleRestructure && (
+                                    <div className="flex items-center space-x-2 mr-2">
+                                        <Switch
+                                            id={`restructure-${asset.id}`}
+                                            checked={!!asset.isRestructured}
+                                            onChange={() => onToggleRestructure(asset.id, 'B')}
+                                            className={asset.isRestructured ? 'bg-blue-500' : 'bg-input'}
+                                        />
+                                        {asset.isRestructured && <Banknote className="h-4 w-4 text-blue-500 animate-pulse" />}
+                                    </div>
+                                )}
                                 <span className="font-mono text-blue-500">${asset.cap_hit_millions}M</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveAsset(asset.id, 'B')}>
                                     <X className="h-3 w-3" />

@@ -1,125 +1,332 @@
 "use client"
 
 import * as React from "react"
-import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, KeyboardSensor, MeasuringStrategy } from "@dnd-kit/core"
+import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, KeyboardSensor, TouchSensor, MeasuringStrategy } from "@dnd-kit/core"
 import { TeamAssetColumn } from "./team-asset-column"
 import { TradeSimulationZone } from "./trade-simulation-zone"
-import { simulateTrade } from "@/app/actions"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Info } from "lucide-react"
+import { CapImpactCard } from "./cap-impact-card"
+import { TradeAsset, calculateTradeImpact, generateTradeGrade, SimulationResult, generateCounterOffer } from "@/lib/trade-logic"
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { SidePanel } from "@/components/ui/side-panel"
+import { TradeIntelligenceStream } from "./trade-intelligence-stream"
+import { Activity, Lock, AlertTriangle, PlusCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { getTradeableAssets } from "@/app/actions"
+import { ApiClient, TradeProposal } from "@/lib/api-client"
+import { CapImpactChart } from "./ui/cap-impact-chart"
 
 export function TradeMachine() {
     const [teamA, setTeamA] = React.useState("")
     const [teamB, setTeamB] = React.useState("")
-    const [assetsA, setAssetsA] = React.useState<any[]>([])
-    const [assetsB, setAssetsB] = React.useState<any[]>([])
-    const [simulationResult, setSimulationResult] = React.useState<any>(null)
 
+    // Staging Data
+    const [assetsA, setAssetsA] = React.useState<TradeAsset[]>([])
+    const [assetsB, setAssetsB] = React.useState<TradeAsset[]>([])
+
+    // Logic Configuration
+    const [postJune1, setPostJune1] = React.useState(false)
+    const [simulationResult, setSimulationResult] = React.useState<SimulationResult | null>(null)
+    const [showIntel, setShowIntel] = React.useState(false)
+
+    // Adversarial State
+    const [counterOffer, setCounterOffer] = React.useState<TradeAsset | null>(null)
+    const [isSimulating, setIsSimulating] = React.useState(false)
+
+    // DND Sensors
+    // We use PointerSensor (mouse/touch) but TouchSensor is more specific for mobile drag
     const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        }),
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }), // Add delay to prevent accidental drags while scrolling
         useSensor(KeyboardSensor)
     )
 
+    // Derived Financial State
+    const impactA = React.useMemo(() =>
+        calculateTradeImpact(teamA || "Team A", assetsB, assetsA, postJune1),
+        [teamA, assetsA, assetsB, postJune1]);
+
+    const impactB = React.useMemo(() =>
+        calculateTradeImpact(teamB || "Team B", assetsA, assetsB, postJune1),
+        [teamB, assetsA, assetsB, postJune1]);
+
+
     const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event
+        const { active, over } = event;
+        if (!over) return;
 
-        if (!over) return
+        const asset = active.data.current as TradeAsset;
+        const dropZone = over.id as string;
 
-        const asset = active.data.current as any
-        const dropZone = over.id as string
-
-        if (asset && dropZone === 'team-a-trade-zone' && asset.team === teamA) {
-            if (!assetsA.find(a => a.id === asset.id)) {
-                setAssetsA([...assetsA, asset])
-            }
-        } else if (asset && dropZone === 'team-b-trade-zone' && asset.team === teamB) {
-            if (!assetsB.find(a => a.id === asset.id)) {
-                setAssetsB([...assetsB, asset])
-            }
+        if (dropZone === 'team-a-trade-zone' && asset.team === teamA) {
+            if (!assetsA.find(a => a.id === asset.id)) setAssetsA([...assetsA, asset]);
+        }
+        else if (dropZone === 'team-b-trade-zone' && asset.team === teamB) {
+            if (!assetsB.find(a => a.id === asset.id)) setAssetsB([...assetsB, asset]);
         }
     }
 
     const removeAsset = (id: string, team: 'A' | 'B') => {
-        if (team === 'A') {
-            setAssetsA(assetsA.filter(a => a.id !== id))
-        } else {
-            setAssetsB(assetsB.filter(a => a.id !== id))
-        }
+        if (team === 'A') setAssetsA(assetsA.filter(a => a.id !== id));
+        else setAssetsB(assetsB.filter(a => a.id !== id));
+        // Clear results on change
+        setSimulationResult(null);
+        setCounterOffer(null);
+    }
+
+    const toggleRestructure = (id: string, team: 'A' | 'B') => {
+        const updater = (list: TradeAsset[]) => list.map(a => {
+            if (a.id === id) {
+                return { ...a, isRestructured: !a.isRestructured };
+            }
+            return a;
+        });
+
+        if (team === 'A') setAssetsA(updater(assetsA));
+        else setAssetsB(updater(assetsB));
+
+        setSimulationResult(null);
     }
 
     const handleSimulate = async () => {
-        const result = await simulateTrade([...assetsA, ...assetsB])
-        setSimulationResult(result)
+        setIsSimulating(true);
+        setCounterOffer(null);
+
+        // 1. Construct Proposal Payload
+        const proposal: TradeProposal = {
+            team_a: teamA,
+            team_b: teamB,
+            team_a_assets: assetsA,
+            team_b_assets: assetsB,
+            config: { postJune1 }
+        };
+
+        try {
+            // 2. Call Adversarial Engine API
+            const apiResult = await ApiClient.evaluateTrade(proposal);
+
+            // 3. Map API Result to SimulationResult
+            // Note: We still use client-side math for the 'Impacts' (Cap numbers) because that needs to be instant
+            // But the GRADE and SUMMARY come from the Python brain.
+
+            const result: SimulationResult = {
+                success: true,
+                grade: apiResult.grade as any, // Cast to strict type
+                summary: apiResult.reason,
+                impacts: {
+                    [teamA]: impactA,
+                    [teamB]: impactB
+                },
+                score: apiResult.grade === 'A+' ? 99 : apiResult.grade === 'F' ? 50 : 75 // Mock score mapping for now
+            };
+
+            setSimulationResult(result);
+
+            // 4. Handle Rejection / Counter-Offer
+            if (apiResult.status === 'rejected') {
+                const counter = await ApiClient.getCounterOffer(proposal);
+                if (counter) {
+                    setCounterOffer(counter);
+                }
+            }
+
+        } catch (error) {
+            console.error("Simulation failed:", error);
+        } finally {
+            setIsSimulating(false);
+        }
+    }
+
+    const acceptCounter = () => {
+        if (!counterOffer) return;
+
+        // Add to the LOSER'S acquired assets? No, add to the WINNER'S traded assets.
+        // If Team A is loser, and Team B is winner. Team B gives CounterAsset.
+        // So we add to assets of Team B (if Team B is the source).
+
+        if (counterOffer.team === teamA) {
+            setAssetsA([...assetsA, counterOffer]);
+        } else {
+            setAssetsB([...assetsB, counterOffer]);
+        }
+
+        setCounterOffer(null);
+        setSimulationResult(null); // Force re-sim
+    }
+
+    const loadScenario = (scenario: any) => {
+        setTeamA(scenario.buyer);
+        setTeamB(scenario.seller);
+        setAssetsA([]);
+        setAssetsB([]);
+
+        const mockPlayerAsset: TradeAsset = {
+            id: scenario.player,
+            name: scenario.player,
+            team: scenario.seller,
+            position: 'unk',
+            cap_hit_millions: scenario.cap,
+            dead_cap_millions: scenario.cap * 0.2,
+            risk_score: 0.5,
+            surplus_value: scenario.seller_gain + scenario.buyer_gain, // approximate
+            type: 'player'
+        };
+
+        setAssetsB([mockPlayerAsset]);
+        setShowIntel(false);
+        setSimulationResult(null);
+        setCounterOffer(null);
     }
 
     return (
-        <DndContext
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
-            measuring={{
-                droppable: {
-                    strategy: MeasuringStrategy.Always
-                }
-            }}
-        >
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}>
             <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column: Team A Assets */}
-                    <div className="lg:col-span-1">
-                        <TeamAssetColumn title="Team A Roster" onTeamChange={setTeamA} />
+
+                {/* Control Bar */}
+                <div className="flex items-center justify-between bg-secondary/20 p-4 rounded-lg border border-border">
+                    <div className="flex items-center space-x-6">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="post-june-1" checked={postJune1} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPostJune1(e.target.checked)} />
+                            <Label htmlFor="post-june-1" className="font-mono uppercase text-xs">Post-June 1 Designation</Label>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-emerald-950/20 border-emerald-500/50 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/30"
+                            onClick={() => setShowIntel(true)}
+                        >
+                            <Activity className="mr-2 h-4 w-4" />
+                            OPEN INTEL STREAM
+                        </Button>
+                    </div>
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                        <Lock className="h-3 w-3" />
+                        <span className="text-[10px] uppercase tracking-widest">Season: 2026</span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+
+                    {/* Left: Team A Source */}
+                    <div className="lg:col-span-3">
+                        <TeamAssetColumn title="Team A (Buyer)" onTeamChange={setTeamA} />
                     </div>
 
-                    {/* Center Column: Simulation Zone */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 mb-4">
-                            <div className="flex gap-2">
-                                <Info className="h-4 w-4 text-emerald-500 mt-0.5" />
-                                <p className="text-xs text-muted-foreground">
-                                    Drag players from either team into their respective exchange zones to simulate the trade impact.
-                                </p>
-                            </div>
-                        </div>
+                    {/* Center: The Exchange & Impact */}
+                    <div className="lg:col-span-6 flex flex-col gap-6">
+
+                        {/* Simulation Zone */}
                         <TradeSimulationZone
                             teamA={teamA}
                             teamB={teamB}
                             assetsA={assetsA}
                             assetsB={assetsB}
                             onRemoveAsset={removeAsset}
+                            onToggleRestructure={toggleRestructure}
                             onSimulate={handleSimulate}
                         />
 
+                        {/* Live Impact Assessment */}
+                        {(teamA && teamB) && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <CapImpactCard impact={impactA} title={`${teamA} Cap`} />
+                                <CapImpactCard impact={impactB} title={`${teamB} Cap`} />
+                            </div>
+                        )}
+
+                        {/* Simulation Results (Tufte Style) */}
                         {simulationResult && (
-                            <Card className="border-emerald-500 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-mono text-emerald-500 uppercase">Simulation Report</CardTitle>
+                            <div className="col-span-12 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {/* Grade Card */}
+                                    <Card className="bg-slate-900 border-emerald-500/50">
+                                        <CardHeader>
+                                            <CardTitle className="text-center text-4xl font-black text-emerald-400">
+                                                {simulationResult.grade}
+                                            </CardTitle>
+                                            <p className="text-center text-xs text-muted-foreground uppercase tracking-widest">Trade Grade</p>
+                                        </CardHeader>
+                                    </Card>
+
+                                    {/* Tufte's Cap Impact Visual */}
+                                    <Card className="bg-slate-900 border-border md:col-span-2">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm uppercase font-mono text-muted-foreground">Net Cap Impact (Savings)</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <CapImpactChart
+                                                teamA={teamA}
+                                                impactA={simulationResult.impacts[teamA]?.net_cap_change || 0}
+                                                teamB={teamB}
+                                                impactB={simulationResult.impacts[teamB]?.net_cap_change || 0}
+                                            />
+                                            <p className="text-xs text-muted-foreground mt-2 text-center italic">
+                                                Positive bars indicate cap space created. Red bars indicate cap space consumed.
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* Analysis Text */}
+                                <div className="mt-4 p-4 border border-dashed border-muted rounded-lg bg-black/20">
+                                    <p className="font-mono text-sm text-center text-emerald-500/80">
+                                        &quot;{simulationResult.summary}&quot;
+                                    </p>
+                                </div>
+
+                            </div>
+                        )}
+
+                        {counterOffer && (
+                            <Card className="border-red-500 bg-red-950/20 animate-in zoom-in-95 duration-300">
+                                <CardHeader className="pb-2 border-b border-red-500/30">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center space-x-2 text-red-500">
+                                            <AlertTriangle className="h-5 w-5" />
+                                            <CardTitle className="text-sm font-mono uppercase">Trade Rejected</CardTitle>
+                                        </div>
+                                        <span className="text-xs font-mono text-red-400 uppercase tracking-widest">Low Value Exchange</span>
+                                    </div>
                                 </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-foreground mb-4">{simulationResult.summary}</p>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 bg-secondary rounded-md">
-                                            <p className="text-[10px] text-muted-foreground uppercase">Win Prob Δ</p>
-                                            <p className="text-lg font-bold text-emerald-500">+{(simulationResult.win_prob_delta * 100).toFixed(1)}%</p>
+                                <CardContent className="pt-4">
+                                    <p className="text-sm text-foreground/90 font-medium leading-relaxed">
+                                        The {counterOffer.team} Front Office rejects your proposal. They demand additional value to bridge the gap.
+                                    </p>
+
+                                    <div className="mt-4 bg-red-950/40 border border-red-900/50 p-3 rounded-md flex justify-between items-center">
+                                        <div>
+                                            <div className="text-[10px] text-red-400 uppercase font-bold mb-1">Counter-Proposal</div>
+                                            <div className="font-mono text-sm font-bold text-white">{counterOffer.name}</div>
+                                            <div className="text-[10px] text-muted-foreground">{counterOffer.position} • Cap: ${counterOffer.cap_hit_millions.toFixed(1)}M</div>
                                         </div>
-                                        <div className="p-3 bg-secondary rounded-md">
-                                            <p className="text-[10px] text-muted-foreground uppercase">Efficiency Score</p>
-                                            <p className="text-lg font-bold text-emerald-500">A+</p>
-                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={acceptCounter}
+                                            className="bg-red-600 hover:bg-red-500 text-white border-0"
+                                        >
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            Accept Asset
+                                        </Button>
                                     </div>
                                 </CardContent>
                             </Card>
                         )}
+
                     </div>
 
-                    {/* Right Column: Team B Assets */}
-                    <div className="lg:col-span-1">
-                        <TeamAssetColumn title="Team B Roster" onTeamChange={setTeamB} />
+                    {/* Right: Team B Source */}
+                    <div className="lg:col-span-3">
+                        <TeamAssetColumn title="Team B (Seller)" onTeamChange={setTeamB} />
                     </div>
                 </div>
+
+                <SidePanel isOpen={showIntel} onClose={() => setShowIntel(false)}>
+                    <TradeIntelligenceStream
+                        teamFilter={teamA || teamB}
+                        onSelectScenario={loadScenario}
+                    />
+                </SidePanel>
             </div>
         </DndContext>
     )

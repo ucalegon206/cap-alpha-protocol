@@ -4,7 +4,6 @@ lxml
 html5lib
 beautifulsoup4
 duckdb
-numpy
-python-dateutil
-fastapi
-uvicorn
+pytest
+PyYAML
+cloudscraper

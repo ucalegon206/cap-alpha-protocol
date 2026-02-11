@@ -1,6 +1,8 @@
 'use client';
 
-import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Cell } from 'recharts';
+import * as React from 'react';
+
+import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, ReferenceArea, Cell, Label } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -16,54 +18,181 @@ interface EfficiencyLandscapeProps {
 }
 
 export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
-    // Filter for significant players to avoid noise
-    const chartData = data
-        .filter(d => d.cap_hit_millions > 2)
-        .map(d => ({
-            ...d,
-            // Production = FMV
-            // Cost = Cap Hit
-            efficiency: (d.surplus_value - d.cap_hit_millions).toFixed(1),
-        }));
+    const [capFilter, setCapFilter] = React.useState<string>("high"); // Default to High Cap to reduce noise
+    const [posFilter, setPosFilter] = React.useState<string>("all");
+
+    // Zoom State
+    const [refAreaLeft, setRefAreaLeft] = React.useState<string | number | null>(null);
+    const [refAreaRight, setRefAreaRight] = React.useState<string | number | null>(null);
+    const [left, setLeft] = React.useState<string | number>('dataMin');
+    const [right, setRight] = React.useState<string | number>('dataMax');
+    const [top, setTop] = React.useState<string | number>('dataMax+1');
+    const [bottom, setBottom] = React.useState<string | number>('dataMin-1');
+
+    // Filter Logic
+    const chartData = React.useMemo(() => {
+        return data
+            .filter(d => {
+                // Cap Filter
+                if (capFilter === "high" && d.cap_hit_millions < 5) return false; // Focus on major starters > $5M
+                if (capFilter === "mid" && (d.cap_hit_millions < 1 || d.cap_hit_millions >= 5)) return false;
+                if (capFilter === "low" && d.cap_hit_millions >= 1) return false;
+
+                // Position Filter
+                if (posFilter !== "all" && d.position !== posFilter) return false;
+
+                // Noise reduction: trim crazy outliers if showing all
+                if (d.cap_hit_millions > 70) return false;
+
+                return true;
+            })
+            .map(d => ({
+                ...d,
+                efficiency: (d.surplus_value - d.cap_hit_millions).toFixed(1),
+            }));
+    }, [data, capFilter, posFilter]);
+
+    const uniquePositions = Array.from(new Set(data.map(d => d.position))).sort();
+
+    const zoom = () => {
+        if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
+            setRefAreaLeft(null);
+            setRefAreaRight(null);
+            return;
+        }
+
+        // Correct order
+        let l: string | number = refAreaLeft;
+        let r: string | number = refAreaRight;
+
+        if (typeof l === 'number' && typeof r === 'number' && l > r) {
+            [l, r] = [r, l];
+        }
+
+        setLeft(l);
+        setRight(r);
+        setRefAreaLeft(null);
+        setRefAreaRight(null);
+    };
+
+    const zoomOut = () => {
+        setLeft('dataMin');
+        setRight('dataMax');
+        setTop('dataMax+1');
+        setBottom('dataMin-1');
+    };
 
     return (
         <Card className="col-span-4 bg-background border-border shadow-md">
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle className="text-xl">Market Efficiency Landscape</CardTitle>
-                        <CardDescription>
-                            Comparing <span className="text-emerald-500 font-bold">Production (FMV)</span> vs. <span className="text-rose-500 font-bold">Cost (Cap Hit)</span>.
-                            Top-left is "Surplus Value" (Good). Bottom-right is "Dead Weight" (Bad).
-                        </CardDescription>
+            <CardHeader className="pb-2">
+                <div className="flex flex-col gap-4">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="text-xl">Market Efficiency Landscape</CardTitle>
+                            <CardDescription>
+                                Identifying <span className="text-emerald-500 font-bold">Surplus Value</span> vs. <span className="text-rose-500 font-bold">Bad Contracts</span>.
+                            </CardDescription>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={zoomOut} className="text-xs bg-secondary px-2 py-1 rounded hover:bg-secondary/80 transition-colors">
+                                Reset Zoom
+                            </button>
+                            <div className="flex gap-2">
+                                <select
+                                    className="h-8 rounded-md border border-input bg-background px-3 text-xs"
+                                    value={posFilter}
+                                    onChange={(e) => setPosFilter(e.target.value)}
+                                >
+                                    <option value="all">All Positions</option>
+                                    {uniquePositions.map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+
+                                <select
+                                    className="h-8 rounded-md border border-input bg-background px-3 text-xs"
+                                    value={capFilter}
+                                    onChange={(e) => setCapFilter(e.target.value)}
+                                >
+                                    <option value="all">All Contracts (Noisy)</option>
+                                    <option value="high">High Cap ({'>'}$5M)</option>
+                                    <option value="mid">Mid Tier ($1M-$5M)</option>
+                                    <option value="low">Rookie/Min ({'<'}$1M)</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <Badge variant="outline" className="font-mono">N={chartData.length}</Badge>
+
+                    {/* PROMINENT LEGEND */}
+                    <div className="bg-muted/30 p-3 rounded-lg border border-border grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                        {/* Risk Color */}
+                        <div className="flex items-center gap-4">
+                            <span className="font-semibold text-muted-foreground uppercase tracking-wider">Contract Risk:</span>
+                            <div className="flex gap-3">
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-emerald-500"></div> Low</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-400"></div> Med</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-rose-500"></div> High</div>
+                            </div>
+                        </div>
+
+                        {/* Bubble Size */}
+                        <div className="flex items-center gap-4">
+                            <span className="font-semibold text-muted-foreground uppercase tracking-wider">Bubble Size:</span>
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                                <div className="w-3 h-3 rounded-full bg-slate-400"></div>
+                                <div className="w-4 h-4 rounded-full bg-slate-400"></div>
+                                <span className="text-muted-foreground italic">Larger = Higher Volatility (Consistency Score)</span>
+                            </div>
+                        </div>
+
+                        {/* Interaction Hint */}
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M11 8v6" /><path d="M8 11h6" /></svg>
+                            <span>Click & Drag to Zoom</span>
+                        </div>
+                    </div>
                 </div>
             </CardHeader>
-            <CardContent className="h-[400px] w-full p-0">
+
+            <CardContent className="h-[500px] w-full p-4 select-none">
                 <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        {/* Quadrant Lines */}
-                        <ReferenceLine y={20} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" label={{ value: 'Elite Cost Threshold ($20M)', position: 'insideBottomRight', fill: 'gray', fontSize: 10 }} />
-                        <ReferenceLine x={20} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                    <ScatterChart
+                        margin={{ top: 20, right: 30, bottom: 40, left: 40 }}
+                        onMouseDown={(e: any) => e && setRefAreaLeft(e.xValue)}
+                        onMouseMove={(e: any) => refAreaLeft && e && setRefAreaRight(e.xValue)}
+                        onMouseUp={zoom}
+                    >
+                        <ReferenceLine y={0} stroke="hsl(var(--border))" />
+                        <ReferenceLine x={0} stroke="hsl(var(--border))" />
 
                         <XAxis
                             type="number"
                             dataKey="cap_hit_millions"
                             name="Cost"
                             unit="M"
-                            label={{ value: 'Examples: Deshaun Watson (High Cost)', position: 'insideBottom', offset: -10, fill: 'gray', fontSize: 12 }}
-                            domain={[0, 'auto']}
-                        />
+                            domain={[left, right]}
+                            tickFormatter={(val) => `$${val}M`}
+                            allowDataOverflow
+                        >
+                            <Label value="Annual Cap Hit (Cost)" offset={0} position="bottom" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '12px', fontWeight: 500 }} />
+                        </XAxis>
                         <YAxis
                             type="number"
                             dataKey="surplus_value"
                             name="Production"
                             unit="M"
-                            label={{ value: 'Examples: Brock Purdy (High Value)', angle: -90, position: 'insideLeft', fill: 'gray', fontSize: 12 }}
-                            domain={[0, 'auto']}
-                        />
-                        <ZAxis type="number" dataKey="risk_score" range={[50, 400]} name="Risk" />
+                            domain={[bottom, top]}
+                            tickFormatter={(val) => `$${val}M`}
+                            allowDataOverflow
+                        >
+                            <Label
+                                value="Fair Market Value (Production)"
+                                angle={-90}
+                                position="insideLeft"
+                                style={{ textAnchor: 'middle', fill: 'hsl(var(--muted-foreground))', fontSize: '12px', fontWeight: 500 }}
+                            />
+                        </YAxis>
+
+                        <ZAxis type="number" dataKey="risk_score" range={[60, 400]} name="Risk" />
 
                         <Tooltip
                             cursor={{ strokeDasharray: '3 3' }}
@@ -71,18 +200,27 @@ export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
                                 if (active && payload && payload.length) {
                                     const d = payload[0].payload;
                                     return (
-                                        <div className="rounded-lg border bg-popover p-3 shadow-sm">
+                                        <div className="rounded-lg border bg-popover p-3 shadow-md z-50 min-w-[200px]">
                                             <div className="flex flex-col gap-1">
-                                                <span className="font-bold text-sm uppercase">{d.player_name}</span>
-                                                <div className="flex justify-between gap-4 text-xs">
-                                                    <span className="text-muted-foreground">{d.team} • {d.position}</span>
-                                                    <span className={Number(d.efficiency) > 0 ? "text-emerald-500" : "text-rose-500"}>
-                                                        {Number(d.efficiency) > 0 ? "+" : ""}{d.efficiency}M Value
-                                                    </span>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-bold text-sm uppercase">{d.player_name}</span>
+                                                    <Badge variant="outline" className="text-[10px] h-5">{d.team}</Badge>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-2 mt-2 text-[10px] text-muted-foreground">
-                                                    <div>Cost: ${d.cap_hit_millions}M</div>
-                                                    <div>FMV: ${d.surplus_value.toFixed(1)}M</div>
+                                                <div className="text-xs text-muted-foreground">{d.position}</div>
+
+                                                <div className="h-px bg-border my-2" />
+
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                                    <span className="text-muted-foreground">Cap Cost:</span>
+                                                    <span className="font-mono text-right">${d.cap_hit_millions.toFixed(2)}M</span>
+
+                                                    <span className="text-muted-foreground">Real Value:</span>
+                                                    <span className="font-mono text-right text-emerald-500">${d.surplus_value.toFixed(2)}M</span>
+
+                                                    <span className="text-muted-foreground">Net:</span>
+                                                    <span className={`font-mono text-right font-bold ${Number(d.efficiency) > 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                                        {Number(d.efficiency) > 0 ? "+" : ""}{d.efficiency}M
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -97,10 +235,15 @@ export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
                                 <Cell
                                     key={`cell-${index}`}
                                     fill={entry.risk_score > 0.7 ? '#f43f5e' : entry.risk_score > 0.4 ? '#fbbf24' : '#10b981'}
-                                    fillOpacity={0.7}
+                                    fillOpacity={0.8}
                                 />
                             ))}
                         </Scatter>
+
+                        {refAreaLeft && refAreaRight ? (
+                            <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} />
+                        ) : null}
+
                     </ScatterChart>
                 </ResponsiveContainer>
             </CardContent>

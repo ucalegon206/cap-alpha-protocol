@@ -5,6 +5,22 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
 }
 
+export function generateCapHistory(baseCap: number, risk: number): number[] {
+    // Generate 4 data points (Past, Current, Future, Future)
+    // If Risk is High, Cap tends to explode upwards (backloaded).
+    // If Risk is Low, Cap is stable or flat.
+
+    const volatility = risk * 5; // Variance
+    const trend = risk > 0.6 ? 1.2 : 1.0; // Multiplier
+
+    return [
+        Math.max(0.8, baseCap * 0.8), // Past year (usually lower)
+        baseCap,                      // Current
+        baseCap * trend,              // Next Year
+        baseCap * trend * trend       // Year 4
+    ];
+}
+
 export const NFL_TEAMS: Record<string, 'AFC' | 'NFC'> = {
     // AFC East
     'BUF': 'AFC', 'MIA': 'AFC', 'NE': 'AFC', 'NYJ': 'AFC',

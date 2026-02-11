@@ -1,5 +1,11 @@
 # Git
 .git
+.DS_Store
+.venv
+.venv_pipeline
+libs
+__pycache__
+*.pyc
 .gitignore
 
 # Web Artifacts (Huge)

@@ -17,16 +17,19 @@ ENV CHROMEDRIVER_BIN=/usr/bin/chromium-driver
 ENV PYTHONUNBUFFERED=1
 
 # Copy requirements from pipeline dir
-COPY pipeline/requirements-frozen.txt .
+COPY pipeline/requirements.txt .
 
 # Install dependencies
-RUN pip install --no-cache-dir -r requirements-frozen.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code from pipeline dir
 COPY pipeline/ .
 
 # Copy contracts
 COPY contracts /app/contracts
+
+# Copy tests
+COPY tests /app/tests
 
 # Create non-root user for security
 RUN useradd -m appuser && chown -R appuser /app

@@ -14,7 +14,8 @@ const PlayerEfficiencySchema = z.object({
   games_played: z.number().optional().default(0),
   cap_hit_millions: z.number().default(0),
   dead_cap_millions: z.number().default(0),
-  edce_risk: z.number().default(0), // Risk Score (0-1)
+  edce_risk: z.number().default(0), // Expected Dead Cap Error ($M)
+  risk_score: z.number().default(0), // Normalized Risk Probability (0-1)
   fair_market_value: z.number().default(0), // Surplus Value
 });
 
@@ -42,7 +43,8 @@ function generateMockFinancials(player: any): PlayerEfficiency {
     ...player,
     cap_hit_millions: player.cap_hit_millions || baseCap,
     dead_cap_millions: player.dead_cap_millions || (baseCap * 0.5),
-    edce_risk: player.edce_risk || risk,
+    edce_risk: player.edce_risk || (risk * 10), // approximate error
+    risk_score: player.risk_score || risk,
     fair_market_value: player.fair_market_value || surplus,
     year: player.year || 2024
   };
@@ -63,7 +65,7 @@ async function getHydratedData(): Promise<PlayerEfficiency[]> {
       }
 
       const p = result.data;
-      if (p.cap_hit_millions === 0 && p.edce_risk === 0) {
+      if (p.cap_hit_millions === 0 && p.risk_score === 0) {
         return generateMockFinancials(p);
       }
       return p;
@@ -93,7 +95,7 @@ export async function getRosterData() {
     .map((d) => ({
       ...d,
       // Ensure frontend friendly names if needed, but schema matches types now
-      risk_score: d.edce_risk,
+      risk_score: d.risk_score,
       surplus_value: d.fair_market_value
     }))
     .sort((a, b) => b.cap_hit_millions - a.cap_hit_millions);
@@ -118,7 +120,7 @@ export async function getTeamCapSummary() {
     teams[d.team].count += 1;
 
     // Risk Threshold: 0.7
-    if (d.edce_risk > 0.7) {
+    if (d.risk_score > 0.7) {
       teams[d.team].risk_cap += d.cap_hit_millions;
     }
   });
@@ -132,20 +134,25 @@ export async function getTeams() {
   return teams.sort();
 }
 
-export async function getTradeableAssets(team: string) {
+export async function getTradeableAssets(team?: string) {
   const data = await getHydratedData();
-  return data
-    .filter((d) => d.team === team)
-    .map((d) => ({
-      id: d.player_name, // Unique ID ideally
-      name: d.player_name,
-      team: d.team,
-      position: d.position,
-      cap_hit_millions: d.cap_hit_millions,
-      risk_score: d.edce_risk,
-      surplus_value: d.fair_market_value,
-      type: 'player'
-    }))
+
+  let filtered = data;
+  if (team) {
+    filtered = data.filter((d) => d.team === team);
+  }
+
+  return filtered.map((d) => ({
+    id: d.player_name, // Unique ID ideally
+    name: d.player_name,
+    team: d.team,
+    position: d.position,
+    cap_hit_millions: d.cap_hit_millions,
+    risk_score: d.risk_score,
+    dead_cap_millions: d.dead_cap_millions,
+    surplus_value: d.fair_market_value,
+    type: 'player'
+  }))
     .sort((a, b) => b.cap_hit_millions - a.cap_hit_millions);
 }
 

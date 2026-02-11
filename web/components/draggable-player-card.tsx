@@ -4,6 +4,8 @@ import { useDraggable } from "@dnd-kit/core"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { GripVertical } from "lucide-react"
+import { CapSparkline } from "./ui/cap-sparkline"
+import { generateCapHistory } from "@/lib/utils"
 
 export function DraggablePlayerCard({ player }: { player: any }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -29,6 +31,15 @@ export function DraggablePlayerCard({ player }: { player: any }) {
                             <p className="font-bold text-sm uppercase">{player.name}</p>
                             <p className="text-xs text-muted-foreground">{player.position} • {player.team}</p>
                         </div>
+                    </div>
+
+                    {/* Tufte Sparkline: Cap History */}
+                    <div className="hidden sm:block opacity-50 hover:opacity-100 transition-opacity">
+                        <CapSparkline
+                            data={generateCapHistory(player.cap_hit_millions, player.risk_score)}
+                            width={48}
+                            height={24}
+                        />
                     </div>
                     <div className="text-right">
                         <p className="text-sm font-mono text-emerald-500">${player.cap_hit_millions}M</p>

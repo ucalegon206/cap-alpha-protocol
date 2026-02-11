@@ -134,6 +134,21 @@ def run_league_scan():
             
     print(f"📄 Report Generated: {report_path}")
 
+    # 6b. Export to JSON for Web App
+    import json
+    import os
+    
+    # Write to local data volume (mapped to ./data on host)
+    # The Make/Deploy process will copy this to web/data
+    json_export_path = "data/trade_scenarios.json"
+    
+    os.makedirs(os.path.dirname(json_export_path), exist_ok=True)
+    
+    with open(json_export_path, "w") as f:
+        json.dump(potential_trades, f, indent=2)
+        
+    print(f"💾 JSON Data Exported: {json_export_path} ({len(potential_trades)} scenarios)")
+
     # 7. Report Generation (Per Player / Market Heat)
     print(f"Generating Player Market Report...")
     player_trades = defaultdict(list)
