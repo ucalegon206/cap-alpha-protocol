@@ -6,12 +6,14 @@ import logging
 
 try:
     from src.adversarial_engine import AdversarialEngine
+    from src.win_probability import WinProbabilityModel
 except ImportError:
     # Handle running from different directories
     import sys
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
     from src.adversarial_engine import AdversarialEngine
+    from src.win_probability import WinProbabilityModel
 
 # Setup Logger
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +23,7 @@ app = FastAPI(title="Cap Alpha Protocol - Adversarial Engine")
 
 # Initialize Engine
 engine = AdversarialEngine()
+win_model = WinProbabilityModel()
 
 class TradeProposal(BaseModel):
     team_a: str
@@ -51,6 +54,16 @@ def generate_counter(proposal: TradeProposal):
         return counter
     except Exception as e:
         logger.error(f"Error generating counter: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/analyze/vegas")
+def analyze_vegas(proposal: TradeProposal):
+    try:
+        logger.info(f"Analyzing Vegas impact for: {proposal.team_a} <-> {proposal.team_b}")
+        impact = win_model.calculate_win_impact(proposal.dict())
+        return impact
+    except Exception as e:
+        logger.error(f"Error analyzing Vegas impact: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

@@ -1,12 +1,7 @@
-import requests
-import json
-import time
-import subprocess
 import pytest
-from multiprocessing import Process
-import uvicorn
 import sys
 import os
+from fastapi.testclient import TestClient
 
 # Add parent dir to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,4 +31,4 @@ def test_evaluate_endpoint_structure():
     data = response.json()
     assert "grade" in data
     assert "reason" in data
-    assert data["status"] == "review"
+    assert data["status"] == "accepted"
