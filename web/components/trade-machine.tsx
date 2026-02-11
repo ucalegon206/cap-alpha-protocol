@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { getTradeableAssets } from "@/app/actions"
 import { ApiClient, TradeProposal } from "@/lib/api-client"
 import { CapImpactChart } from "./ui/cap-impact-chart"
+import { VegasDashboard } from "./vegas-dashboard"
 
 export function TradeMachine() {
     const [teamA, setTeamA] = React.useState("")
@@ -105,6 +106,7 @@ export function TradeMachine() {
         try {
             // 2. Call Adversarial Engine API
             const apiResult = await ApiClient.evaluateTrade(proposal);
+            const vegasImpact = await ApiClient.getVegasImpact(proposal);
 
             // 3. Map API Result to SimulationResult
             // Note: We still use client-side math for the 'Impacts' (Cap numbers) because that needs to be instant
@@ -118,7 +120,8 @@ export function TradeMachine() {
                     [teamA]: impactA,
                     [teamB]: impactB
                 },
-                score: apiResult.grade === 'A+' ? 99 : apiResult.grade === 'F' ? 50 : 75 // Mock score mapping for now
+                score: apiResult.grade === 'A+' ? 99 : apiResult.grade === 'F' ? 50 : 75, // Mock score mapping for now
+                vegas_impact: vegasImpact || undefined // Add Vegas Data
             };
 
             setSimulationResult(result);
@@ -278,6 +281,18 @@ export function TradeMachine() {
                             </div>
                         )}
 
+                        {/* Vegas Dashboard (Bettor Persona) */}
+                        {(simulationResult?.vegas_impact && teamA && teamB) && (
+                            <div className="col-span-12 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+                                <VegasDashboard
+                                    teamA={teamA}
+                                    impactA={simulationResult.vegas_impact[teamA]}
+                                    teamB={teamB}
+                                    impactB={simulationResult.vegas_impact[teamB]}
+                                />
+                            </div>
+                        )}
+
                         {counterOffer && (
                             <Card className="border-red-500 bg-red-950/20 animate-in zoom-in-95 duration-300">
                                 <CardHeader className="pb-2 border-b border-red-500/30">
@@ -328,6 +343,6 @@ export function TradeMachine() {
                     />
                 </SidePanel>
             </div>
-        </DndContext>
+        </DndContext >
     )
 }

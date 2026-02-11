@@ -23,12 +23,22 @@ export interface TradeImpact {
     assets_lost: TradeAsset[];
 }
 
+export interface VegasImpact {
+    delta_wins: number;
+    new_win_total: number;
+    vegas_variance: number;
+    ceiling: number;
+    floor: number;
+    super_bowl_odds_delta: string;
+}
+
 export interface SimulationResult {
     success: boolean;
     grade: 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'F';
     summary: string;
     impacts: Record<string, TradeImpact>; // teamId -> Impact
     score: number; // 0-100
+    vegas_impact?: Record<string, VegasImpact>;
 }
 
 /**

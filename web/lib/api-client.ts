@@ -1,6 +1,6 @@
-import { TradeAsset } from "./trade-logic";
+import { TradeAsset, VegasImpact } from "./trade-logic";
 
-export type { TradeAsset };
+export type { TradeAsset, VegasImpact };
 
 export interface TradeProposal {
     team_a: string;
@@ -20,6 +20,7 @@ export interface TradeResult {
     reason: string;
     status: "accepted" | "rejected" | "review";
     analysis?: TradeAnalysis;
+    vegas_impact?: Record<string, VegasImpact>;
 }
 
 const API_BASE = '/api/python';
@@ -66,6 +67,21 @@ export const ApiClient = {
             return await response.json();
         } catch (e) {
             console.error("Counter Offer Error:", e);
+            return null;
+        }
+    },
+
+    getVegasImpact: async (proposal: TradeProposal): Promise<Record<string, VegasImpact> | null> => {
+        try {
+            const response = await fetch(`${API_BASE}/analyze/vegas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(proposal),
+            });
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (e) {
+            console.error("Vegas Analysis Error:", e);
             return null;
         }
     }
