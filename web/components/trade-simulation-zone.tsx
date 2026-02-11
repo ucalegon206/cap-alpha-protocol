@@ -62,7 +62,7 @@ export function TradeSimulationZone({
                                     </div>
                                 )}
                                 <span className={`font-mono ${asset.isRestructured ? 'text-emerald-500 font-bold decoration-dashed' : 'text-emerald-500'}`}>
-                                    ${asset.cap_hit_millions}M
+                                    ${Number(asset.cap_hit_millions).toFixed(2)}M
                                 </span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveAsset(asset.id, 'A')}>
                                     <X className="h-3 w-3" />
@@ -100,7 +100,7 @@ export function TradeSimulationZone({
                                         {asset.isRestructured && <Banknote className="h-4 w-4 text-blue-500 animate-pulse" />}
                                     </div>
                                 )}
-                                <span className="font-mono text-blue-500">${asset.cap_hit_millions}M</span>
+                                <span className="font-mono text-blue-500">${Number(asset.cap_hit_millions).toFixed(2)}M</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveAsset(asset.id, 'B')}>
                                     <X className="h-3 w-3" />
                                 </Button>

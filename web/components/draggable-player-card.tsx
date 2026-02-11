@@ -42,7 +42,7 @@ export function DraggablePlayerCard({ player }: { player: any }) {
                         />
                     </div>
                     <div className="text-right">
-                        <p className="text-sm font-mono text-emerald-500">${player.cap_hit_millions}M</p>
+                        <p className="text-sm font-mono text-emerald-500">${Number(player.cap_hit_millions).toFixed(2)}M</p>
                         <Badge variant={player.risk_score > 0.7 ? "destructive" : "outline"} className="text-[10px] py-0 px-1">
                             RISK: {player.risk_score.toFixed(2)}
                         </Badge>
