@@ -58,7 +58,7 @@ Spotrac Contracts (32 teams) → Staging → Normalization (join PFR)
 | **Enrichment** | Join contracts + PFR roster (age, performance) | `src/normalization.py` |
 | **Ingestion** | Stage raw contracts | `src/ingestion.py` |
 | **dbt Models** | Transform to ML-ready mart | `dbt/models/staging/` + `dbt/models/marts/` |
-| **Airflow Tasks** | Orchestrate weekly pipeline | `dags/nfl_dead_money_pipeline.py` |
+| **Airflow Tasks** | Orchestrate weekly pipeline | `dags/pipeline.py` |
 
 ### New Data Outputs
 
@@ -266,7 +266,7 @@ Expected model performance: **70%+ precision, 60%+ recall**
 src/spotrac_scraper_v2.py     (+249 lines)  Contract scraper
 src/normalization.py           (+82 lines)   Enrichment functions  
 src/ingestion.py              (+50 lines)   Contract staging
-dags/nfl_dead_money_pipeline.py(+20 lines)  Airflow tasks
+dags/pipeline.py               (+20 lines)  Airflow tasks
 dbt/models/staging/stg_player_contracts.sql    (NEW)
 dbt/models/staging/stg_player_rosters.sql      (NEW)
 dbt/models/marts/fct_player_dead_money_features.sql  (NEW - ⭐)

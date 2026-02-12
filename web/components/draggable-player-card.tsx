@@ -3,11 +3,11 @@
 import { useDraggable } from "@dnd-kit/core"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { GripVertical } from "lucide-react"
+import { GripVertical, Target } from "lucide-react"
 import { CapSparkline } from "./ui/cap-sparkline"
 import { generateCapHistory } from "@/lib/utils"
 
-export function DraggablePlayerCard({ player }: { player: any }) {
+export function DraggablePlayerCard({ player, onSelect }: { player: any, onSelect?: (player: any) => void }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: player.id,
         data: {
@@ -46,6 +46,19 @@ export function DraggablePlayerCard({ player }: { player: any }) {
                         <Badge variant={player.risk_score > 0.7 ? "destructive" : "outline"} className="text-[10px] py-0 px-1">
                             RISK: {player.risk_score.toFixed(2)}
                         </Badge>
+                        {onSelect && (
+                            <button
+                                className="ml-2 p-1 hover:bg-emerald-500/20 rounded-full transition-colors"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelect(player);
+                                }}
+                                title="Find Buyers"
+                            >
+                                <Target className="h-4 w-4 text-emerald-500" />
+                            </button>
+                        )}
                     </div>
                 </CardContent>
             </Card>

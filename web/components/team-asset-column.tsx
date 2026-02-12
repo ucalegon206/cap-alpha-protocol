@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge"
 
 type SortOption = "cap" | "dead" | "surplus";
 
-export function TeamAssetColumn({ title, onTeamChange }: { title: string, onTeamChange?: (team: string) => void }) {
+export function TeamAssetColumn({ title, onTeamChange, onAssetSelect }: { title: string, onTeamChange?: (team: string) => void, onAssetSelect?: (asset: any) => void }) {
     const [teams, setTeams] = React.useState<string[]>([])
     const [selectedTeam, setSelectedTeam] = React.useState<string>("")
     const [conferenceFilter, setConferenceFilter] = React.useState<"ALL" | "AFC" | "NFC">("ALL")
@@ -182,7 +182,7 @@ export function TeamAssetColumn({ title, onTeamChange }: { title: string, onTeam
                             )}
 
                             {assets.map((asset) => (
-                                <DraggablePlayerCard key={asset.id} player={asset} />
+                                <DraggablePlayerCard key={asset.id} player={asset} onSelect={onAssetSelect} />
                             ))}
                         </div>
                     ) : (

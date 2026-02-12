@@ -48,12 +48,7 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}/pipeline
     
-    - name: Run dead money validator directly
-      run: |
-        python pipeline/src/dead_money_validator.py
-      env:
-        PYTHONPATH: ${{ github.workspace }}/pipeline
-      continue-on-error: true  # Report but don't block on validator WARN status
+
     
     - name: Upload coverage reports
       if: always()

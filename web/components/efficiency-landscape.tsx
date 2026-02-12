@@ -5,6 +5,8 @@ import * as React from 'react';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, ReferenceArea, Cell, Label } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { usePersona } from "@/components/persona-context";
+
 
 interface EfficiencyLandscapeProps {
     data: {
@@ -15,9 +17,16 @@ interface EfficiencyLandscapeProps {
         surplus_value: number; // FMV
         risk_score: number;
     }[];
+    teams?: {
+        team: string;
+        total_cap: number;
+        risk_cap: number;
+        count: number;
+    }[];
 }
 
-export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
+export function EfficiencyLandscape({ data, teams = [] }: EfficiencyLandscapeProps) {
+    const { persona } = usePersona();
     const [capFilter, setCapFilter] = React.useState<string>("high"); // Default to High Cap to reduce noise
     const [posFilter, setPosFilter] = React.useState<string>("all");
 
@@ -31,6 +40,24 @@ export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
 
     // Filter Logic
     const chartData = React.useMemo(() => {
+        if (persona === 'AGENT') {
+            // Agent View: Teams (Cap Space vs Risk)
+            // Cap 2024: $255.4M
+            const SALARY_CAP = 255.4;
+            return teams.map(t => ({
+                player_name: t.team,
+                team: t.team,
+                position: 'TEAM',
+                // X: Cap Space
+                cap_hit_millions: parseFloat((SALARY_CAP - (t.total_cap / 1e6)).toFixed(1)),
+                // Y: Risk Exposure
+                surplus_value: parseFloat((t.risk_cap / 1e6).toFixed(1)),
+                // Z: Count
+                risk_score: t.count * 10, // Scale up for visibility
+                efficiency: '0'
+            }));
+        }
+
         return data
             .filter(d => {
                 // Cap Filter
@@ -50,7 +77,7 @@ export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
                 ...d,
                 efficiency: (d.surplus_value - d.cap_hit_millions).toFixed(1),
             }));
-    }, [data, capFilter, posFilter]);
+    }, [data, capFilter, posFilter, persona, teams]);
 
     const uniquePositions = Array.from(new Set(data.map(d => d.position))).sort();
 
@@ -82,15 +109,25 @@ export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
         setBottom('dataMin-1');
     };
 
+    const xLabel = persona === 'AGENT' ? "Cap Space Available" : "Annual Cap Hit (Cost)";
+    const yLabel = persona === 'AGENT' ? "Risk Exposure" : "Fair Market Value (Production)";
+    const xName = persona === 'AGENT' ? "Cap Space" : "Cost";
+    const yName = persona === 'AGENT' ? "Risk" : "Production";
+
     return (
         <Card className="col-span-4 bg-background border-border shadow-md">
             <CardHeader className="pb-2">
                 <div className="flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle className="text-xl">Market Efficiency Landscape</CardTitle>
+                            <CardTitle className="text-xl">
+                                {persona === 'AGENT' ? 'Team Leverage Landscape' : 'Market Efficiency Landscape'}
+                            </CardTitle>
                             <CardDescription>
-                                Identifying <span className="text-emerald-500 font-bold">Surplus Value</span> vs. <span className="text-rose-500 font-bold">Bad Contracts</span>.
+                                {persona === 'AGENT'
+                                    ? <span>Finding <span className="text-emerald-500 font-bold">Cap Space</span> vs. <span className="text-rose-500 font-bold">Risk Exposure</span>.</span>
+                                    : <span>Identifying <span className="text-emerald-500 font-bold">Surplus Value</span> vs. <span className="text-rose-500 font-bold">Bad Contracts</span>.</span>
+                                }
                             </CardDescription>
                         </div>
                         <div className="flex gap-2">
@@ -167,25 +204,25 @@ export function EfficiencyLandscape({ data }: EfficiencyLandscapeProps) {
                         <XAxis
                             type="number"
                             dataKey="cap_hit_millions"
-                            name="Cost"
+                            name={xName}
                             unit="M"
                             domain={[left, right]}
                             tickFormatter={(val) => `$${val}M`}
                             allowDataOverflow
                         >
-                            <Label value="Annual Cap Hit (Cost)" offset={0} position="bottom" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '12px', fontWeight: 500 }} />
+                            <Label value={xLabel} offset={0} position="bottom" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '12px', fontWeight: 500 }} />
                         </XAxis>
                         <YAxis
                             type="number"
                             dataKey="surplus_value"
-                            name="Production"
+                            name={yName}
                             unit="M"
                             domain={[bottom, top]}
                             tickFormatter={(val) => `$${val}M`}
                             allowDataOverflow
                         >
                             <Label
-                                value="Fair Market Value (Production)"
+                                value={yLabel}
                                 angle={-90}
                                 position="insideLeft"
                                 style={{ textAnchor: 'middle', fill: 'hsl(var(--muted-foreground))', fontSize: '12px', fontWeight: 500 }}

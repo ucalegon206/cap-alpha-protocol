@@ -18,11 +18,11 @@ class TestDagIntegrity(unittest.TestCase):
             f'DAG import failures. Errors: {self.dagbag.import_errors}'
         )
 
-    def test_nfl_pipeline_loaded(self):
-        """Verify specifically that nfl_pipeline is loaded."""
-        dag = self.dagbag.get_dag(dag_id='nfl_pipeline')
+    def test_pipeline_loaded(self):
+        """Verify specifically that the main pipeline is loaded."""
+        dag = self.dagbag.get_dag(dag_id='pipeline')
         self.assertIsNotNone(dag)
-        self.assertEqual(len(dag.tasks), 5) # scrape, ingest, feature, train, report
+        self.assertEqual(len(dag.tasks), 19) # 19 production tasks
 
 if __name__ == '__main__':
     unittest.main()

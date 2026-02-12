@@ -1,53 +1,26 @@
-# Git
-.git
 .DS_Store
+.git
 .venv
-.venv_pipeline
-libs
-__pycache__
-*.pyc
-.gitignore
-
-# Web Artifacts (Huge)
-web/node_modules
-web/.next
-web/.turbo
-web/build
-node_modules
-
-# Python / Environment
+venv
+env
+env_alpha
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 .Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
+*.egg-info
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.pytest_cache/
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Docker
-.docker
-
-# Data (Don't build in data, mount it)
-data/
-models/
+htmlcov
+.pytest_cache
+node_modules
+.next
+out
+build
+dist
+tmp
+contracts/
+tests/
+pipeline/tests/
+pipeline/logs/
+data/duckdb/

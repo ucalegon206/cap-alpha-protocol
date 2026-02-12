@@ -6,6 +6,7 @@ import { TradeMachine } from "@/components/trade-machine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PersonaSwitcher from "@/components/persona-switcher";
 
 export default async function Home() {
     // Get Data (hydrated from JSON with Mock Fallback if needed)
@@ -26,7 +27,8 @@ export default async function Home() {
                     <h1 className="text-4xl font-bold tracking-tight text-foreground">CAP ALPHA <span className="text-emerald-500">PROTOCOL</span></h1>
                     <p className="text-muted-foreground mt-2">Executive Roster Management System // v2026.02.08</p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex gap-4 items-center">
+                    <PersonaSwitcher />
                     <Badge variant="outline" className="text-lg px-4 py-1 border-emerald-500 text-emerald-500">MARKET: OPEN</Badge>
                     <Badge variant="secondary" className="text-lg px-4 py-1">League Year: 2026</Badge>
                 </div>

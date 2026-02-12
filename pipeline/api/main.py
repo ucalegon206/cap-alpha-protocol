@@ -7,6 +7,7 @@ import logging
 try:
     from src.adversarial_engine import AdversarialEngine
     from src.win_probability import WinProbabilityModel
+    from src.trade_partner_finder import TradePartnerFinder
 except ImportError:
     # Handle running from different directories
     import sys
@@ -14,6 +15,7 @@ except ImportError:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
     from src.adversarial_engine import AdversarialEngine
     from src.win_probability import WinProbabilityModel
+    from src.trade_partner_finder import TradePartnerFinder
 
 # Setup Logger
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +26,7 @@ app = FastAPI(title="Cap Alpha Protocol - Adversarial Engine")
 # Initialize Engine
 engine = AdversarialEngine()
 win_model = WinProbabilityModel()
+partner_finder = TradePartnerFinder()
 
 class TradeProposal(BaseModel):
     team_a: str
@@ -64,6 +67,16 @@ def analyze_vegas(proposal: TradeProposal):
         return impact
     except Exception as e:
         logger.error(f"Error analyzing Vegas impact: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/trade/find_partner/{player_id}")
+def find_partner(player_id: str, cap_hit: float, position: str = "QB"):
+    try:
+        logger.info(f"Finding partners for {player_id} ({position}, ${cap_hit}M)")
+        partners = partner_finder.find_buyers(player_id, position=position, cap_hit=cap_hit)
+        return {"player": player_id, "top_partners": partners}
+    except Exception as e:
+        logger.error(f"Error finding partners: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

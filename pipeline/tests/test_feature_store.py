@@ -160,3 +160,109 @@ def test_feature_boundary_conditions(store):
     # 4. Day BEFORE valid_until (2024-02-14) -> Should find feature
     df_before_end = store.get_training_matrix(as_of_date=date(2024, 2, 14), min_year=2023)
     assert df_before_end.iloc[0]['bound_feat'] == 50.0 
+
+def test_interaction_features(store):
+    """Test that materializing interaction features works and sets valid_from."""
+    # Setup data
+    store.db.execute("DROP TABLE IF EXISTS fact_player_efficiency")
+    store.db.execute("""
+        CREATE TABLE fact_player_efficiency (
+            player_name VARCHAR, 
+            year INTEGER, 
+            team VARCHAR,
+            age INTEGER,
+            cap_hit_millions DOUBLE,
+            draft_round INTEGER
+        )
+    """)
+    store.db.execute("""
+        INSERT INTO fact_player_efficiency VALUES 
+        ('P_Interact', 2023, 'TeamC', 25, 10.0, 1)
+    """)
+    
+    store.materialize_interaction_features(source_table='fact_player_efficiency')
+    
+    # Check 'age_cap_interaction': 25 * 10.0 = 250.0
+    # Valid from: March 15th of the year (2023-03-15)
+    
+    res = store.db.execute("""
+        SELECT feature_value, valid_from 
+        FROM feature_values 
+        WHERE feature_name = 'age_cap_interaction' 
+          AND player_name = 'P_Interact'
+    """).fetchone()
+    
+    assert res is not None
+    val, valid_from = res
+    assert val == 250.0
+    assert valid_from == date(2023, 3, 15)
+
+def test_historical_features_diagonal_join(store):
+    """Test retrieval of features for multiple years using start-of-season logic."""
+    # Data Setup:
+    # Player 'Legacy':
+    # 2021 Season Stats -> Known Feb 2022. Lag 1 for 2022 season.
+    # 2022 Season Stats -> Known Feb 2023. Lag 1 for 2023 season.
+    
+    # We insert into feature_values directly to control timestamps perfectly
+    store.db.execute("""
+        INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
+        VALUES 
+        ('k22', 'Legacy', 2022, 'yards_lag_1', 1000.0, '2022-02-15', '2023-02-15'),
+        ('k23', 'Legacy', 2023, 'yards_lag_1', 1100.0, '2023-02-15', '2024-02-15')
+    """)
+    
+    # Base population
+    store.db.execute("INSERT INTO fact_player_efficiency (player_name, year) VALUES ('Legacy', 2022), ('Legacy', 2023)")
+    
+    # Retrieve Batch (Diagonal Join)
+    # Logic: For 2022 prediction, uses data valid at 2022-09-01. (Should get 1000.0)
+    #        For 2023 prediction, uses data valid at 2023-09-01. (Should get 1100.0)
+    
+    df = store.get_historical_features(min_year=2022, max_year=2023)
+    
+    assert len(df) == 2
+    row_22 = df[df['year'] == 2022].iloc[0]
+    row_23 = df[df['year'] == 2023].iloc[0]
+    
+    assert row_22['yards_lag_1'] == 1000.0
+    assert row_23['yards_lag_1'] == 1100.0
+
+def test_temporal_integrity_validation(store):
+    """Test that we detect forward-looking info (leakage)."""
+    # Create a legitimate feature
+    store.db.execute("""
+        INSERT INTO feature_registry (feature_name, feature_type) VALUES ('clean_feat', 'lag')
+    """)
+    store.db.execute("""
+        INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
+        VALUES ('p1', 'Clean', 2023, 'clean_feat', 1.0, '2023-02-01', NULL)
+    """)
+    
+    # Create a LEAKY feature
+    # Prediction Year 2023 (Season starts Sept 2023)
+    # But valid_from is Dec 2023 (Future!)
+    store.db.execute("""
+        INSERT INTO feature_registry (feature_name, feature_type) VALUES ('leaky_feat', 'lag')
+    """)
+    store.db.execute("""
+        INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
+        VALUES ('p2', 'Leaky', 2023, 'leaky_feat', 1.0, '2023-12-01', NULL)
+    """)
+    
+    # Should return False (integrity check failed)
+    assert store.validate_temporal_integrity() is False
+
+def test_feature_stats(store):
+    """Smoke test for stats generation."""
+    store.db.execute("""
+        INSERT INTO feature_registry (feature_name, feature_type) VALUES ('f1', 'lag')
+    """)
+    store.db.execute("""
+        INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
+        VALUES ('k1', 'P1', 2023, 'f1', 10.0, '2023-02-01', NULL)
+    """)
+    
+    stats = store.get_feature_stats()
+    assert not stats.empty
+    assert 'lag' in stats['feature_type'].values

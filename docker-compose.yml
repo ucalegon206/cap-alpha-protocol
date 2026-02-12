@@ -1,31 +1,86 @@
-services:
-  scraper:
-    build:
-      context: .
-      dockerfile: pipeline/Dockerfile
-    volumes:
-      - ./pipeline:/app
-      - ./data:/app/data
-      - ./contracts:/app/contracts
-    environment:
-      - PYTHONPATH=/app
-      - DB_PATH=/app/data/duckdb/nfl_production.db
-    command: tail -f /dev/null # Keep alive for exec
+version: '3.8'
 
-  pipeline:
-    build:
-      context: .
-      dockerfile: pipeline/Dockerfile
-    volumes:
-      - ./pipeline:/app
-      - ./data:/app/data
-      - ./contracts:/app/contracts
-      - nfl_models_vol:/app/models # Maps /app/models to a Docker volume (bypassing host .pkl block)
+x-airflow-common: &x-airflow-common
+  build:
+    context: .
+    dockerfile: pipeline/Dockerfile
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+    - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - PYTHONPATH=/app/pipeline:/app
+    - DB_PATH=/app/data/duckdb/nfl_production.db
+  volumes:
+    - ./pipeline/dags:/opt/airflow/dags
+    - ./pipeline/logs:/opt/airflow/logs
+    - ./pipeline/plugins:/opt/airflow/plugins
+    - ./pipeline:/app/pipeline
+    - ./data:/app/data
+    - ./contracts:/app/contracts
+
+services:
+  postgres:
+    image: postgres:13
     environment:
-      - PYTHONPATH=/app
-      - MODEL_DIR=/app/models
-      - DB_PATH=/app/data/duckdb/nfl_production.db
-    command: tail -f /dev/null # Keep alive for exec
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
+      interval: 5s
+      retries: 5
+
+  airflow-init:
+    <<: *x-airflow-common
+    command: version
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        # Wait for postgres
+        while ! nc -z postgres 5432; do   
+          sleep 1
+        done
+        airflow db init && \
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    <<: *x-airflow-common
+    command: airflow webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  airflow-scheduler:
+    <<: *x-airflow-common
+    command: airflow scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
 
 volumes:
-  nfl_models_vol:
+  postgres-db-volume:

@@ -15,26 +15,26 @@ The **Cap Alpha Protocol Pipeline** is a hermetic data engineering system design
 
 ---
 
-## Environment & Setup
+### Installation (Docker - Recommended)
 
-We strictly enforce a **Local Library Strategy** to mitigate environment fragmentation on macOS Apple Silicon.
-
-### Prerequisites
-- Python 3.10+
-- `pip`
-- DuckDB
-
-### Installation
+We recommend running the entire stack via Docker for a consistent environment.
 
 ```bash
-# 1. Create a virtual environment
+# 1. Build and Start Airflow Services
+docker-compose up -d --build
+
+# 2. Access Airflow UI
+# Navigate to http://localhost:8080
+# Login: admin / admin
+```
+
+### Manual Setup (Local Dev)
+If you prefer identifying dependency issues locally:
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
-
-# 2. Install Dependencies
 pip install -r requirements.txt
-
-# 3. Set Python Path
 export PYTHONPATH="$(pwd):$PYTHONPATH"
 ```
 

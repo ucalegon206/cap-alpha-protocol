@@ -20,7 +20,8 @@ ENV PYTHONUNBUFFERED=1
 COPY pipeline/requirements.txt .
 
 # Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install apache-airflow==2.10.4 --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.4/constraints-3.10.txt"
 
 # Copy source code from pipeline dir
 COPY pipeline/ .

@@ -5,7 +5,7 @@
 
 ## Quick Links
 - [Productionization Roadmap](.github/productionization-roadmap.md)
-- [Airflow DAG Template](dags/nfl_dead_money_pipeline.py)
+- [Airflow DAG Template](dags/pipeline.py)
 - [dbt Project](dbt/)
 - [Data Validation Framework](src/data_validation.py)
 
@@ -174,13 +174,13 @@ dbt test
 
 ```bash
 # Copy DAG to Airflow DAGs folder
-cp dags/nfl_dead_money_pipeline.py /airflow/dags/
+cp dags/pipeline.py /airflow/dags/
 
 # Trigger DAG (test)
-airflow dags test nfl_dead_money_pipeline 2025-01-01
+airflow dags test pipeline 2025-01-01
 
 # Unpause for production
-airflow dags unpause nfl_dead_money_pipeline
+airflow dags unpause pipeline
 ```
 
 ---

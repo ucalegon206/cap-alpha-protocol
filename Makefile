@@ -14,6 +14,9 @@ pipeline:
 test:
 	docker-compose run --rm pipeline pytest tests/
 
+validate:
+	docker-compose run --rm pipeline python pipeline/src/dead_money_validator.py
+
 clean:
 	docker-compose down -v
 

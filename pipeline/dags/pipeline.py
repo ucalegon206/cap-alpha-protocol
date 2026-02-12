@@ -18,10 +18,10 @@ Configuration:
 
 Usage:
     # Default (current year)
-    airflow dags trigger nfl_dead_money_pipeline
+    airflow dags trigger pipeline
     
     # Specific year
-    airflow dags trigger nfl_dead_money_pipeline --conf '{"pipeline_year": 2025}'
+    airflow dags trigger pipeline --conf '{"pipeline_year": 2025}'
 """
 
 from datetime import datetime, timedelta
@@ -70,7 +70,7 @@ default_args = {
 # DAG DEFINITION
 # ============================================================================
 with DAG(
-    'nfl_dead_money_pipeline',
+    'pipeline',
     default_args=default_args,
     description='Weekly NFL dead money pipeline (scrapers → dbt → validation → notebooks)',
     schedule='0 2 * * 1',  # Every Monday at 2 AM UTC

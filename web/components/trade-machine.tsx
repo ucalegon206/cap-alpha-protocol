@@ -17,8 +17,12 @@ import { getTradeableAssets } from "@/app/actions"
 import { ApiClient, TradeProposal } from "@/lib/api-client"
 import { CapImpactChart } from "./ui/cap-impact-chart"
 import { VegasDashboard } from "./vegas-dashboard"
+import { TradePartnerRolodex } from "./trade-partner-rolodex"
+import { usePersona } from "./persona-context"
 
 export function TradeMachine() {
+    const { persona } = usePersona();
+    const [rolodexPlayer, setRolodexPlayer] = React.useState<any>(null);
     const [teamA, setTeamA] = React.useState("")
     const [teamB, setTeamB] = React.useState("")
 
@@ -213,136 +217,144 @@ export function TradeMachine() {
 
                     {/* Left: Team A Source */}
                     <div className="lg:col-span-3">
-                        <TeamAssetColumn title="Team A (Buyer)" onTeamChange={setTeamA} />
+                        <TeamAssetColumn
+                            title="Team A (Buyer)"
+                            onTeamChange={setTeamA}
+                            onAssetSelect={persona === 'AGENT' ? setRolodexPlayer : undefined}
+                        />
                     </div>
 
                     {/* Center: The Exchange & Impact */}
                     <div className="lg:col-span-6 flex flex-col gap-6">
 
-                        {/* Simulation Zone */}
-                        <TradeSimulationZone
-                            teamA={teamA}
-                            teamB={teamB}
-                            assetsA={assetsA}
-                            assetsB={assetsB}
-                            onRemoveAsset={removeAsset}
-                            onToggleRestructure={toggleRestructure}
-                            onSimulate={handleSimulate}
-                        />
+                        {persona === 'AGENT' ? (
+                            <TradePartnerRolodex selectedPlayer={rolodexPlayer} />
+                        ) : (
+                            <>
+                                {/* Simulation Zone */}
+                                <TradeSimulationZone
+                                    teamA={teamA}
+                                    teamB={teamB}
+                                    assetsA={assetsA}
+                                    assetsB={assetsB}
+                                    onRemoveAsset={removeAsset}
+                                    onToggleRestructure={toggleRestructure}
+                                    onSimulate={handleSimulate}
+                                />
 
-                        {/* Live Impact Assessment */}
-                        {(teamA && teamB) && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <CapImpactCard impact={impactA} title={`${teamA} Cap`} />
-                                <CapImpactCard impact={impactB} title={`${teamB} Cap`} />
-                            </div>
-                        )}
+                                {/* Live Impact Assessment */}
+                                {(teamA && teamB) && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <CapImpactCard impact={impactA} title={`${teamA} Cap`} />
+                                        <CapImpactCard impact={impactB} title={`${teamB} Cap`} />
+                                    </div>
+                                )}
 
-                        {/* Simulation Results (Tufte Style) */}
-                        {simulationResult && (
-                            <div className="col-span-12 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {/* Grade Card */}
-                                    <Card className="bg-slate-900 border-emerald-500/50">
-                                        <CardHeader>
-                                            <CardTitle className="text-center text-4xl font-black text-emerald-400">
-                                                {simulationResult.grade}
-                                            </CardTitle>
-                                            <p className="text-center text-xs text-muted-foreground uppercase tracking-widest">Trade Grade</p>
-                                        </CardHeader>
-                                    </Card>
+                                {/* Simulation Results (Tufte Style) */}
+                                {simulationResult && (
+                                    <div className="col-span-12 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            {/* Grade Card */}
+                                            <Card className="bg-slate-900 border-emerald-500/50">
+                                                <CardHeader>
+                                                    <CardTitle className="text-center text-4xl font-black text-emerald-400">
+                                                        {simulationResult.grade}
+                                                    </CardTitle>
+                                                    <p className="text-center text-xs text-muted-foreground uppercase tracking-widest">Trade Grade</p>
+                                                </CardHeader>
+                                            </Card>
 
-                                    {/* Tufte's Cap Impact Visual */}
-                                    <Card className="bg-slate-900 border-border md:col-span-2">
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-sm uppercase font-mono text-muted-foreground">Net Cap Impact (Savings)</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <CapImpactChart
-                                                teamA={teamA}
-                                                impactA={simulationResult.impacts[teamA]?.net_cap_change || 0}
-                                                teamB={teamB}
-                                                impactB={simulationResult.impacts[teamB]?.net_cap_change || 0}
-                                            />
-                                            <p className="text-xs text-muted-foreground mt-2 text-center italic">
-                                                Positive bars indicate cap space created. Red bars indicate cap space consumed.
+                                            {/* Tufte's Cap Impact Visual */}
+                                            <Card className="bg-slate-900 border-border md:col-span-2">
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="text-sm uppercase font-mono text-muted-foreground">Net Cap Impact (Savings)</CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <CapImpactChart
+                                                        teamA={teamA}
+                                                        impactA={simulationResult.impacts[teamA]?.net_cap_change || 0}
+                                                        teamB={teamB}
+                                                        impactB={simulationResult.impacts[teamB]?.net_cap_change || 0}
+                                                    />
+                                                    <p className="text-xs text-muted-foreground mt-2 text-center italic">
+                                                        Positive bars indicate cap space created. Red bars indicate cap space consumed.
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+
+                                        {/* Analysis Text */}
+                                        <div className="mt-4 p-4 border border-dashed border-muted rounded-lg bg-black/20">
+                                            <p className="font-mono text-sm text-center text-emerald-500/80">
+                                                &quot;{simulationResult.summary}&quot;
                                             </p>
+                                        </div>
+
+                                    </div>
+                                )}
+
+                                {/* Vegas Dashboard (Bettor Persona) */}
+                                {(simulationResult?.vegas_impact && teamA && teamB) && (
+                                    <div className="col-span-12 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+                                        <VegasDashboard
+                                            teamA={teamA}
+                                            impactA={simulationResult.vegas_impact[teamA]}
+                                            teamB={teamB}
+                                            impactB={simulationResult.vegas_impact[teamB]}
+                                        />
+                                    </div>
+                                )}
+
+                                {counterOffer && (
+                                    <Card className="border-red-500 bg-red-950/20 animate-in zoom-in-95 duration-300">
+                                        <CardHeader className="pb-2 border-b border-red-500/30">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center space-x-2 text-red-500">
+                                                    <AlertTriangle className="h-5 w-5" />
+                                                    <CardTitle className="text-sm font-mono uppercase">Trade Rejected</CardTitle>
+                                                </div>
+                                                <span className="text-xs font-mono text-red-400 uppercase tracking-widest">Low Value Exchange</span>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="pt-4">
+                                            <p className="text-sm text-foreground/90 font-medium leading-relaxed">
+                                                The {counterOffer.team} Front Office rejects your proposal. They demand additional value to bridge the gap.
+                                            </p>
+
+                                            <div className="mt-4 bg-red-950/40 border border-red-900/50 p-3 rounded-md flex justify-between items-center">
+                                                <div>
+                                                    <div className="text-[10px] text-red-400 uppercase font-bold mb-1">Counter-Proposal</div>
+                                                    <div className="font-mono text-sm font-bold text-white">{counterOffer.name}</div>
+                                                    <div className="text-[10px] text-muted-foreground">{counterOffer.position} • Cap: ${counterOffer.cap_hit_millions.toFixed(1)}M</div>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    onClick={acceptCounter}
+                                                    className="bg-red-600 hover:bg-red-500 text-white border-0"
+                                                >
+                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                    Accept Asset
+                                                </Button>
+                                            </div>
                                         </CardContent>
                                     </Card>
-                                </div>
-
-                                {/* Analysis Text */}
-                                <div className="mt-4 p-4 border border-dashed border-muted rounded-lg bg-black/20">
-                                    <p className="font-mono text-sm text-center text-emerald-500/80">
-                                        &quot;{simulationResult.summary}&quot;
-                                    </p>
-                                </div>
-
-                            </div>
+                                )}
+                            </>
                         )}
-
-                        {/* Vegas Dashboard (Bettor Persona) */}
-                        {(simulationResult?.vegas_impact && teamA && teamB) && (
-                            <div className="col-span-12 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-                                <VegasDashboard
-                                    teamA={teamA}
-                                    impactA={simulationResult.vegas_impact[teamA]}
-                                    teamB={teamB}
-                                    impactB={simulationResult.vegas_impact[teamB]}
-                                />
-                            </div>
-                        )}
-
-                        {counterOffer && (
-                            <Card className="border-red-500 bg-red-950/20 animate-in zoom-in-95 duration-300">
-                                <CardHeader className="pb-2 border-b border-red-500/30">
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center space-x-2 text-red-500">
-                                            <AlertTriangle className="h-5 w-5" />
-                                            <CardTitle className="text-sm font-mono uppercase">Trade Rejected</CardTitle>
-                                        </div>
-                                        <span className="text-xs font-mono text-red-400 uppercase tracking-widest">Low Value Exchange</span>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="pt-4">
-                                    <p className="text-sm text-foreground/90 font-medium leading-relaxed">
-                                        The {counterOffer.team} Front Office rejects your proposal. They demand additional value to bridge the gap.
-                                    </p>
-
-                                    <div className="mt-4 bg-red-950/40 border border-red-900/50 p-3 rounded-md flex justify-between items-center">
-                                        <div>
-                                            <div className="text-[10px] text-red-400 uppercase font-bold mb-1">Counter-Proposal</div>
-                                            <div className="font-mono text-sm font-bold text-white">{counterOffer.name}</div>
-                                            <div className="text-[10px] text-muted-foreground">{counterOffer.position} • Cap: ${counterOffer.cap_hit_millions.toFixed(1)}M</div>
-                                        </div>
-                                        <Button
-                                            size="sm"
-                                            onClick={acceptCounter}
-                                            className="bg-red-600 hover:bg-red-500 text-white border-0"
-                                        >
-                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                            Accept Asset
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
                     </div>
 
                     {/* Right: Team B Source */}
                     <div className="lg:col-span-3">
                         <TeamAssetColumn title="Team B (Seller)" onTeamChange={setTeamB} />
                     </div>
-                </div>
 
-                <SidePanel isOpen={showIntel} onClose={() => setShowIntel(false)}>
-                    <TradeIntelligenceStream
-                        teamFilter={teamA || teamB}
-                        onSelectScenario={loadScenario}
-                    />
-                </SidePanel>
-            </div>
+                    <SidePanel isOpen={showIntel} onClose={() => setShowIntel(false)}>
+                        <TradeIntelligenceStream
+                            teamFilter={teamA || teamB}
+                            onSelectScenario={loadScenario}
+                        />
+                    </SidePanel>
+                </div>
         </DndContext >
     )
 }
