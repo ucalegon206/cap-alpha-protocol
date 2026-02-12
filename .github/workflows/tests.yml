@@ -133,15 +133,3 @@ jobs:
       run: |
         cd dbt && dbt test --project-dir . --profiles-dir .
       continue-on-error: true
-
-      continue-on-error: true
-    
-    - name: Run dbt compile
-      run: |
-        cd dbt && dbt compile --project-dir . --profiles-dir .
-      continue-on-error: true
-    
-    - name: Run dbt test
-      run: |
-        cd dbt && dbt test --project-dir . --profiles-dir .
-      continue-on-error: true
