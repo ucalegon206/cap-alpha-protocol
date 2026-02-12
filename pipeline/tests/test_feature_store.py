@@ -39,6 +39,7 @@ def test_temporal_leakage_protection(store):
     
     # Mock base row for join - ensure types match schema (VARCHAR, INTEGER)
     store.db.execute("INSERT INTO fact_player_efficiency VALUES ('PlayerOne', CAST(2023 AS INTEGER), 'TeamA')")
+    store.db.execute("INSERT INTO fact_player_efficiency VALUES ('PlayerOne', CAST(2024 AS INTEGER), 'TeamA')")
     
     # Query BEFORE valid_from (Should be empty)
     df_early = store.get_training_matrix(as_of_date=date(2023, 1, 1), min_year=2023)
@@ -131,3 +132,31 @@ def test_point_in_time_retrieval(store):
     # If I am training for 2023 target:
     # I should see 20.0 (lag 1 from 2022 data)
     pass 
+
+def test_feature_boundary_conditions(store):
+    """Test exact boundary conditions for feature validity."""
+    # Feature valid from 2023-02-15 to 2024-02-15
+    store.db.execute("""
+        INSERT INTO feature_values (entity_key, player_name, prediction_year, feature_name, feature_value, valid_from, valid_until)
+        VALUES ('P1_2023', 'PlayerBound', 2023, 'bound_feat', 50.0, '2023-02-15', '2024-02-15')
+    """)
+    store.db.execute("INSERT INTO fact_player_efficiency VALUES ('PlayerBound', 2023, 'TeamB')")
+    
+    # 1. Day BEFORE valid_from (2023-02-14) -> Should NOT find feature
+    df_before = store.get_training_matrix(as_of_date=date(2023, 2, 14), min_year=2023)
+    assert 'bound_feat' not in df_before.columns or pd.isna(df_before.iloc[0].get('bound_feat'))
+
+    # 2. ON valid_from date (2023-02-15) -> Should find feature
+    df_on_start = store.get_training_matrix(as_of_date=date(2023, 2, 15), min_year=2023)
+    assert df_on_start.iloc[0]['bound_feat'] == 50.0
+
+    # 3. ON valid_until date (2024-02-15) -> Should NOT find feature (strict < inequality usually, or <= depending on logic)
+    # Logic in query: valid_until > as_of_date. 
+    # If valid_until is 2024-02-15 and as_of is 2024-02-15: 2024-02-15 > 2024-02-15 is FALSE.
+    # So on the expiry date, it is EXPIRED.
+    df_on_end = store.get_training_matrix(as_of_date=date(2024, 2, 15), min_year=2023)
+    assert 'bound_feat' not in df_on_end.columns or pd.isna(df_on_end.iloc[0].get('bound_feat'))
+
+    # 4. Day BEFORE valid_until (2024-02-14) -> Should find feature
+    df_before_end = store.get_training_matrix(as_of_date=date(2024, 2, 14), min_year=2023)
+    assert df_before_end.iloc[0]['bound_feat'] == 50.0 
