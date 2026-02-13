@@ -355,6 +355,6 @@ export function TradeMachine() {
                         />
                     </SidePanel>
                 </div>
-        </DndContext >
+        </DndContext>
     )
 }
