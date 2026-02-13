@@ -27,7 +27,7 @@ export default async function Home() {
             <header className="mb-8 flex items-center justify-between border-b border-border pb-4">
                 <div>
                     <h1 className="text-4xl font-bold tracking-tight text-foreground">CAP ALPHA <span className="text-emerald-500">PROTOCOL</span></h1>
-                    <p className="text-muted-foreground mt-2">Executive Roster Management System // v2026.02.08</p>
+                    <p className="text-muted-foreground mt-2">Executive Roster Management System // v2026.02.08 (Live)</p>
                 </div>
                 <div className="flex gap-4 items-center">
                     <SignedOut>
