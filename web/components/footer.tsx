@@ -14,7 +14,14 @@ const Footer = () => {
                     <span className="h-1 w-1 bg-slate-700 rounded-full"></span>
                     <span>All Rights Reserved</span>
                     <span className="h-1 w-1 bg-slate-700 rounded-full"></span>
-                    <span className="font-mono text-slate-600">v{process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7)}</span>
+                    <a
+                        href={`https://github.com/ucalegon206/cap-alpha-protocol/commit/${process.env.NEXT_PUBLIC_COMMIT_SHA}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-slate-600 hover:text-emerald-500 transition-colors"
+                    >
+                        v{process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7)}
+                    </a>
                 </div>
             </div>
         </footer>
