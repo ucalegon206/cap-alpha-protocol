@@ -13,6 +13,8 @@ const Footer = () => {
                     <span>&copy; {new Date().getFullYear()} Andrew Smith</span>
                     <span className="h-1 w-1 bg-slate-700 rounded-full"></span>
                     <span>All Rights Reserved</span>
+                    <span className="h-1 w-1 bg-slate-700 rounded-full"></span>
+                    <span className="font-mono text-slate-600">v{process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7)}</span>
                 </div>
             </div>
         </footer>
