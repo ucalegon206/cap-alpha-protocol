@@ -11,21 +11,31 @@ export const metadata: Metadata = {
     description: "Advanced Roster Management System",
 };
 
+import { ClerkProvider } from '@clerk/nextjs'
+import { dark } from '@clerk/themes'
+
 export default function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
-            <body className={`${inter.className} min-h-screen flex flex-col`}>
-                <main className="flex-grow">
-                    <PersonaProvider>
-                        {children}
-                    </PersonaProvider>
-                </main>
-                <Footer />
-            </body>
-        </html>
+        <ClerkProvider
+            appearance={{
+                baseTheme: dark,
+                variables: { colorPrimary: '#10b981' }, // Emerald-500
+            }}
+        >
+            <html lang="en">
+                <body className={`${inter.className} min-h-screen flex flex-col`}>
+                    <main className="flex-grow">
+                        <PersonaProvider>
+                            {children}
+                        </PersonaProvider>
+                    </main>
+                    <Footer />
+                </body>
+            </html>
+        </ClerkProvider>
     );
 }

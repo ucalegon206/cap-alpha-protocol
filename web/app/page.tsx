@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PersonaSwitcher from "@/components/persona-switcher";
+import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
 
 export default async function Home() {
     // Get Data (hydrated from JSON with Mock Fallback if needed)
@@ -28,6 +30,16 @@ export default async function Home() {
                     <p className="text-muted-foreground mt-2">Executive Roster Management System // v2026.02.08</p>
                 </div>
                 <div className="flex gap-4 items-center">
+                    <SignedOut>
+                        <SignInButton mode="modal">
+                            <Button variant="outline" className="border-emerald-500 text-emerald-500 hover:bg-emerald-500/10">
+                                Sign In
+                            </Button>
+                        </SignInButton>
+                    </SignedOut>
+                    <SignedIn>
+                        <UserButton afterSignOutUrl="/" />
+                    </SignedIn>
                     <PersonaSwitcher />
                     <Badge variant="outline" className="text-lg px-4 py-1 border-emerald-500 text-emerald-500">MARKET: OPEN</Badge>
                     <Badge variant="secondary" className="text-lg px-4 py-1">League Year: 2026</Badge>

@@ -19,6 +19,7 @@ import { CapImpactChart } from "./ui/cap-impact-chart"
 import { VegasDashboard } from "./vegas-dashboard"
 import { TradePartnerRolodex } from "./trade-partner-rolodex"
 import { usePersona } from "./persona-context"
+import { useUser } from "@clerk/nextjs";
 
 export function TradeMachine() {
     const { persona } = usePersona();
@@ -38,6 +39,46 @@ export function TradeMachine() {
     // Adversarial State
     const [counterOffer, setCounterOffer] = React.useState<TradeAsset | null>(null)
     const [isSimulating, setIsSimulating] = React.useState(false)
+
+    // AI State
+    const [isGeneratingReport, setIsGeneratingReport] = React.useState(false)
+    const [aiReport, setAiReport] = React.useState<string | null>(null)
+    const { user } = useUser(); // Clerk Hook
+
+    const handleGenerateAIReport = async () => {
+        if (!user) {
+            // Redirect to login if using Clerk components, or just alert for MVP
+            alert("Please sign in to access War Room Intelligence.");
+            return;
+        }
+
+        setIsGeneratingReport(true);
+        try {
+            const proposal: TradeProposal = {
+                team_a: teamA,
+                team_b: teamB,
+                team_a_assets: assetsA,
+                team_b_assets: assetsB,
+                config: { postJune1 }
+            };
+
+            const response = await fetch('/api/ai/scouting-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tradeProposal: proposal })
+            });
+
+            if (!response.ok) throw new Error("Failed to generate report");
+
+            const data = await response.json();
+            setAiReport(data.report);
+        } catch (error) {
+            console.error("AI Report Error:", error);
+            alert("Failed to generate report. Please try again.");
+        } finally {
+            setIsGeneratingReport(false);
+        }
+    }
 
     // DND Sensors
     // We use PointerSensor (mouse/touch) but TouchSensor is more specific for mobile drag
@@ -302,6 +343,55 @@ export function TradeMachine() {
                                             teamB={teamB}
                                             impactB={simulationResult.vegas_impact[teamB]}
                                         />
+                                    </div>
+                                )}
+
+                                {/* AI War Room Report (Freemium Feature) */}
+                                {simulationResult && (
+                                    <div className="col-span-12 mt-6">
+                                        {!aiReport ? (
+                                            <div className="flex justify-center">
+                                                <Button
+                                                    size="lg"
+                                                    onClick={handleGenerateAIReport}
+                                                    disabled={isGeneratingReport}
+                                                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold tracking-wide shadow-lg shadow-purple-900/20 border border-purple-400/30"
+                                                >
+                                                    {isGeneratingReport ? (
+                                                        <>
+                                                            <Activity className="mr-2 h-4 w-4 animate-spin" />
+                                                            Consulting The Oracle...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Lock className="mr-2 h-4 w-4" />
+                                                            Unlock War Room Intelligence (1 Credit)
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <Card className="bg-slate-950 border-purple-500/50 shadow-2xl shadow-purple-900/10 animate-in fade-in zoom-in-95 duration-500">
+                                                <CardHeader>
+                                                    <CardTitle className="flex items-center text-purple-400">
+                                                        <Activity className="mr-2 h-5 w-5" />
+                                                        War Room Intelligence Report
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="prose prose-invert prose-sm max-w-none">
+                                                        <div className="whitespace-pre-wrap font-mono text-emerald-50/90 leading-relaxed">
+                                                            {aiReport}
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                                <CardFooter className="bg-purple-950/20 border-t border-purple-500/20 py-2">
+                                                    <p className="text-[10px] text-purple-300/60 uppercase tracking-widest w-full text-center">
+                                                        Generated by CapAlpha AI • Confidential
+                                                    </p>
+                                                </CardFooter>
+                                            </Card>
+                                        )}
                                     </div>
                                 )}
 
