@@ -350,25 +350,28 @@ export function TradeMachine() {
                                 {simulationResult && (
                                     <div className="col-span-12 mt-6">
                                         {!aiReport ? (
-                                            <div className="flex justify-center">
+                                            <div className="flex flex-col items-center gap-2">
                                                 <Button
                                                     size="lg"
                                                     onClick={handleGenerateAIReport}
                                                     disabled={isGeneratingReport}
-                                                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold tracking-wide shadow-lg shadow-purple-900/20 border border-purple-400/30"
+                                                    className="bg-amber-500 hover:bg-amber-400 text-black font-black tracking-wide shadow-[0_0_30px_-5px_rgba(245,158,11,0.6)] border border-amber-300 transform transition-all hover:scale-105 px-8 py-6 text-lg"
                                                 >
                                                     {isGeneratingReport ? (
                                                         <>
-                                                            <Activity className="mr-2 h-4 w-4 animate-spin" />
-                                                            Consulting The Oracle...
+                                                            <Activity className="mr-2 h-5 w-5 animate-spin" />
+                                                            CONSULTING ORACLE...
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Lock className="mr-2 h-4 w-4" />
-                                                            Unlock War Room Intelligence (1 Credit)
+                                                            <Lock className="mr-2 h-5 w-5" />
+                                                            UNLOCK WAR ROOM INTEL (1 CREDIT)
                                                         </>
                                                     )}
                                                 </Button>
+                                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                                                    Identify Hidden Cap Liabilities Instantly
+                                                </p>
                                             </div>
                                         ) : (
                                             <Card className="bg-slate-950 border-purple-500/50 shadow-2xl shadow-purple-900/10 animate-in fade-in zoom-in-95 duration-500">

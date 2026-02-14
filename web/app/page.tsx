@@ -1,3 +1,4 @@
+import React from "react";
 import { getRosterData, getTeamCapSummary } from "./actions";
 import { RosterGrid } from "@/components/roster-grid";
 import { EfficiencyLandscape } from "@/components/efficiency-landscape";
@@ -26,8 +27,8 @@ export default async function Home() {
             {/* Header: The War Room */}
             <header className="mb-8 flex items-center justify-between border-b border-border pb-4">
                 <div>
-                    <h1 className="text-4xl font-bold tracking-tight text-foreground">CAP ALPHA <span className="text-emerald-500">PROTOCOL</span></h1>
-                    <p className="text-muted-foreground mt-2">Executive Roster Management System // v2026.02.08 (Live)</p>
+                    <h1 className="text-4xl font-bold tracking-tight text-foreground">FIND <span className="text-emerald-500">$10M+ CAP SPACE</span> IN 60 SECONDS</h1>
+                    <p className="text-muted-foreground mt-2">Executive Roster Management // Used by 0 Teams (Beta Access) // v2026.02.08</p>
                 </div>
                 <div className="flex gap-4 items-center">
                     <SignedOut>
@@ -101,10 +102,16 @@ export default async function Home() {
                 </Card>
             </div>
 
-            {/* HERO: EFFICIENCY LANDSCAPE */}
-            <section className="mb-8">
-                {/* @ts-ignore */}
-                <EfficiencyLandscape data={rosterData} />
+            <section className="mb-8 relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background z-10 pointer-events-none" />
+                <React.Suspense fallback={
+                    <div className="w-full h-[500px] bg-secondary/20 animate-pulse rounded-lg border border-border flex items-center justify-center">
+                        <div className="text-muted-foreground font-mono animate-bounce">LOADING MARKET EFFICIENCY DATA...</div>
+                    </div>
+                }>
+                    {/* @ts-ignore */}
+                    <EfficiencyLandscape data={rosterData} />
+                </React.Suspense>
             </section>
 
             {/* Main Content: Tabs */}
