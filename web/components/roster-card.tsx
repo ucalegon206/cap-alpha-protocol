@@ -33,7 +33,12 @@ export function RosterCard({ player }: RosterCardProps) {
                     <AvatarFallback>{player.position}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 overflow-hidden">
-                    <h3 className="font-bold truncate leading-none">{player.player_name}</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-bold truncate leading-none">{player.player_name}</h3>
+                        {(player.cap_hit_millions > 0 && player.surplus_value === 0) && (
+                            <Badge variant="destructive" className="text-[10px] h-4 px-1 rounded-sm">DEAD</Badge>
+                        )}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">{player.team} • {player.player_name.split(' ')[0]}</p>
                 </div>
                 <div className="text-right">
@@ -54,7 +59,7 @@ export function RosterCard({ player }: RosterCardProps) {
                     <div className="bg-secondary/50 p-2 rounded">
                         <div className="text-[10px] text-muted-foreground uppercase">Risk Score</div>
                         <div className={cn("font-bold", isHighRisk ? "text-rose-500" : "text-amber-500")}>
-                            {(player.risk_score * 100).toFixed(0)}/100
+                            {(player.cap_hit_millions > 0 && player.surplus_value === 0) ? "N/A" : `${(player.risk_score * 100).toFixed(0)}/100`}
                         </div>
                     </div>
                 </div>

@@ -28,7 +28,12 @@ export function DraggablePlayerCard({ player, onSelect }: { player: any, onSelec
                     <div className="flex items-center gap-3">
                         <GripVertical className="h-4 w-4 text-muted-foreground" />
                         <div>
-                            <p className="font-bold text-sm uppercase">{player.name}</p>
+                            <div className="flex items-center gap-2">
+                                <p className="font-bold text-sm uppercase">{player.name}</p>
+                                {(player.cap_hit_millions > 0 && player.surplus_value === 0) && (
+                                    <Badge variant="destructive" className="text-[10px] h-4 px-1 rounded-sm">DEAD</Badge>
+                                )}
+                            </div>
                             <p className="text-xs text-muted-foreground">{player.position} • {player.team}</p>
                         </div>
                     </div>
@@ -44,7 +49,7 @@ export function DraggablePlayerCard({ player, onSelect }: { player: any, onSelec
                     <div className="text-right">
                         <p className="text-sm font-mono text-emerald-500">${Number(player.cap_hit_millions).toFixed(2)}M</p>
                         <Badge variant={player.risk_score > 0.7 ? "destructive" : "outline"} className="text-[10px] py-0 px-1">
-                            RISK: {player.risk_score.toFixed(2)}
+                            RISK: {(player.cap_hit_millions > 0 && player.surplus_value === 0) ? "N/A" : player.risk_score.toFixed(2)}
                         </Badge>
                         {onSelect && (
                             <button

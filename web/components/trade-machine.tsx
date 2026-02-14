@@ -13,6 +13,7 @@ import { SidePanel } from "@/components/ui/side-panel"
 import { TradeIntelligenceStream } from "./trade-intelligence-stream"
 import { Activity, Lock, AlertTriangle, PlusCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { getTradeableAssets } from "@/app/actions"
 import { ApiClient, TradeProposal } from "@/lib/api-client"
 import { CapImpactChart } from "./ui/cap-impact-chart"
@@ -354,8 +355,13 @@ export function TradeMachine() {
                                                 <Button
                                                     size="lg"
                                                     onClick={handleGenerateAIReport}
-                                                    disabled={isGeneratingReport}
-                                                    className="bg-amber-500 hover:bg-amber-400 text-black font-black tracking-wide shadow-[0_0_30px_-5px_rgba(245,158,11,0.6)] border border-amber-300 transform transition-all hover:scale-105 px-8 py-6 text-lg"
+                                                    disabled={isGeneratingReport || (user?.publicMetadata?.credits as number || 0) < 1}
+                                                    className={cn(
+                                                        "font-black tracking-wide transform transition-all px-8 py-6 text-lg",
+                                                        (user?.publicMetadata?.credits as number || 0) > 0
+                                                            ? "bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_30px_-5px_rgba(245,158,11,0.6)] border border-amber-300 hover:scale-105"
+                                                            : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                                                    )}
                                                 >
                                                     {isGeneratingReport ? (
                                                         <>
@@ -365,12 +371,15 @@ export function TradeMachine() {
                                                     ) : (
                                                         <>
                                                             <Lock className="mr-2 h-5 w-5" />
-                                                            UNLOCK WAR ROOM INTEL (1 CREDIT)
+                                                            {(user?.publicMetadata?.credits as number || 0) > 0
+                                                                ? `UNLOCK WAR ROOM INTEL (1 CREDIT)`
+                                                                : `INSUFFICIENT CREDITS`
+                                                            }
                                                         </>
                                                     )}
                                                 </Button>
                                                 <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                                                    Identify Hidden Cap Liabilities Instantly
+                                                    Balance: {(user?.publicMetadata?.credits as number) || 0} Credits • Identify Hidden Cap Liabilities
                                                 </p>
                                             </div>
                                         ) : (

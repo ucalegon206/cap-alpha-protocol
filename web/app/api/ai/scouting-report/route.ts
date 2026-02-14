@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -19,9 +19,23 @@ export async function POST(req: Request) {
             return new NextResponse("Missing trade proposal", { status: 400 });
         }
 
-        // Logic to check/deduct credits would go here
-        // For MVP, we'll just log it.
-        console.log(`[AI-REPORT] Generating report for user ${userId}`);
+        // --- CREDIT CHECK & DEDUCTION ---
+        const client = await clerkClient();
+        const user = await client.users.getUser(userId);
+        const credits = (user.publicMetadata.credits as number) || 0;
+
+        if (credits < 1) {
+            return new NextResponse("Insufficient Credits. Please upgrade or refill.", { status: 402 });
+        }
+
+        // Deduct 1 Credit
+        await client.users.updateUserMetadata(userId, {
+            publicMetadata: {
+                credits: credits - 1
+            }
+        });
+
+        console.log(`[AI-REPORT] Deducted 1 credit for user ${userId}. New Balance: ${credits - 1}`);
 
         // Construct Prompt
         const prompt = `
@@ -38,6 +52,14 @@ export async function POST(req: Request) {
         Keep it punchy, professional but insider-y. Max 300 words.
         `;
 
+        if (!GEMINI_API_KEY) {
+            // Mock response if no key (Dev mode fallback)
+            console.warn("[WARN] No GEMINI_API_KEY found. Returning mock response.");
+            return NextResponse.json({
+                report: "## MOCK REPORT (Dev Mode)\n\n**Owner's Reaction**: 'We got him for WHAT?!' - The owner is dancing on the table.\n\n**Locker Room**: The veterans are skeptical, but the rookies are excited.\n\n**Hidden Upside**: This clears $15M in cap space for next year's free agency class."
+            });
+        }
+
         // Call Gemini API
         const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
             method: "POST",
@@ -50,6 +72,12 @@ export async function POST(req: Request) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error("Gemini API Error:", errorText);
+
+            // Refund the credit on failure
+            await client.users.updateUserMetadata(userId, {
+                publicMetadata: { credits: credits } // Restore original
+            });
+
             return new NextResponse("AI Service Unavailable", { status: 502 });
         }
 
