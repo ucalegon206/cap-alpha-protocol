@@ -2,10 +2,10 @@ import duckdb
 
 # Connect to the database
 try:
-    con = duckdb.connect('nfl_dead_money.duckdb')
+    con = duckdb.connect('nfl_dead_money.duckdb', read_only=True)
 except:
     try:
-        con = duckdb.connect('dbt/nfl_dead_money.duckdb')
+        con = duckdb.connect('dbt/nfl_dead_money.duckdb', read_only=True)
     except Exception as e:
         print(f"Could not connect to database: {e}")
         exit(1)
