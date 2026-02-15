@@ -2,8 +2,16 @@
 
 import { z } from 'zod';
 import rosterData from '../data/roster_dump.json';
+import historicalData from '../data/historical_predictions.json';
 
 // --- SCHEMA DEFINITIONS (The Bridge) ---
+
+const HistorySchema = z.object({
+  year: z.number(),
+  team: z.string(),
+  actual: z.number(),
+  predicted: z.number(),
+});
 
 const PlayerEfficiencySchema = z.object({
   player_name: z.string(),
@@ -17,10 +25,12 @@ const PlayerEfficiencySchema = z.object({
   edce_risk: z.number().default(0), // Expected Dead Cap Error ($M)
   risk_score: z.number().default(0), // Normalized Risk Probability (0-1)
   fair_market_value: z.number().default(0), // Surplus Value
+  history: z.array(HistorySchema).optional().default([]), // Historical Authentication
 });
 
 // Infer the type from the schema
 export type PlayerEfficiency = z.infer<typeof PlayerEfficiencySchema>;
+export type PlayerHistory = z.infer<typeof HistorySchema>;
 
 // --- MOCK DATA GENERATOR (The Safety Net) ---
 // Used when the real pipeline data is missing or $0 (as confirmed in audit).
@@ -56,6 +66,20 @@ async function getHydratedData(): Promise<PlayerEfficiency[]> {
   try {
     const rawData: any[] = rosterData as any[];
 
+    // transform historical data into a lookup map for O(1) access
+    const historyMap = new Map<string, PlayerHistory[]>();
+    (historicalData as any[]).forEach((record) => {
+      if (!historyMap.has(record.player_name)) {
+        historyMap.set(record.player_name, []);
+      }
+      historyMap.get(record.player_name)?.push({
+        year: record.year,
+        team: record.team,
+        actual: record.actual,
+        predicted: record.predicted
+      });
+    });
+
     // Validate and Parse, applying Mock Fallback if needed
     const parsedData = rawData.map(item => {
       const result = PlayerEfficiencySchema.safeParse(item);
@@ -65,6 +89,12 @@ async function getHydratedData(): Promise<PlayerEfficiency[]> {
       }
 
       const p = result.data;
+
+      // Attach History
+      const history = historyMap.get(p.player_name) || [];
+      // Sort history by year ascending
+      p.history = history.sort((a, b) => a.year - b.year);
+
       if (p.cap_hit_millions === 0 && p.risk_score === 0) {
         return generateMockFinancials(p);
       }

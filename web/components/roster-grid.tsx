@@ -14,6 +14,7 @@ import {
     useReactTable,
 } from "@tanstack/react-table"
 import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -36,6 +37,13 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { NFL_TEAMS } from "@/lib/utils"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { CapSparkline } from "@/components/ui/cap-sparkline"
 
 export type PlayerMetric = {
     player_name: string
@@ -51,7 +59,14 @@ export const columns: ColumnDef<PlayerMetric>[] = [
         accessorKey: "player_name",
         header: "Player",
         cell: ({ row }) => (
-            <div className="capitalize font-medium">{row.getValue("player_name")}</div>
+            <div className="capitalize font-medium">
+                <Link
+                    href={`/player/${encodeURIComponent(row.getValue("player_name"))}`}
+                    className="hover:underline hover:text-emerald-400 transition-colors"
+                >
+                    {row.getValue("player_name")}
+                </Link>
+            </div>
         ),
     },
     {
@@ -72,13 +87,25 @@ export const columns: ColumnDef<PlayerMetric>[] = [
         accessorKey: "cap_hit_millions",
         header: ({ column }) => {
             return (
-                <Button
-                    variant="ghost"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                >
-                    Cap Hit ($M)
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
+                <div className="flex w-full justify-end items-center gap-2">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    className="flex items-center gap-1 hover:bg-transparent px-0"
+                                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                                >
+                                    Cap Hit ($M)
+                                    <ArrowUpDown className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Current season salary cap charge</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             )
         },
         cell: ({ row }) => {
@@ -96,13 +123,25 @@ export const columns: ColumnDef<PlayerMetric>[] = [
         accessorKey: "risk_score",
         header: ({ column }) => {
             return (
-                <Button
-                    variant="ghost"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                >
-                    Risk Score
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
+                <div className="flex w-full justify-end items-center gap-2">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    className="flex items-center gap-1 hover:bg-transparent px-0"
+                                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                                >
+                                    Risk Score
+                                    <ArrowUpDown className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>0-1 score assessing contract volatility & injury risk</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             )
         },
         cell: ({ row }) => {
@@ -118,16 +157,41 @@ export const columns: ColumnDef<PlayerMetric>[] = [
         }
     },
     {
+        id: "trend",
+        header: "Cost Trend",
+        cell: ({ row }) => {
+            // @ts-ignore
+            const history = row.original.history || [];
+            return (
+                <div className="flex justify-end">
+                    <CapSparkline data={history} />
+                </div>
+            )
+        }
+    },
+    {
         accessorKey: "surplus_value",
         header: ({ column }) => {
             return (
-                <Button
-                    variant="ghost"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                >
-                    Surplus ($M)
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
+                <div className="flex w-full justify-end items-center gap-2">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    className="flex items-center gap-1 hover:bg-transparent px-0"
+                                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                                >
+                                    Value ($M)
+                                    <ArrowUpDown className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Net Performance Value (Surplus)</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             )
         },
         cell: ({ row }) => {

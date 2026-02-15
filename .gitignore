@@ -57,3 +57,4 @@ web/.next/
 web/out/
 web/build/
 .env.local
+pipeline/libs_314/

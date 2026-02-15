@@ -27,8 +27,8 @@ export default async function Home() {
             {/* Header: The War Room */}
             <header className="mb-8 flex items-center justify-between border-b border-border pb-4">
                 <div>
-                    <h1 className="text-4xl font-bold tracking-tight text-foreground">FIND <span className="text-emerald-500">$10M+ CAP SPACE</span> IN 60 SECONDS</h1>
-                    <p className="text-muted-foreground mt-2">Executive Roster Management // Used by 0 Teams (Beta Access) // v2026.02.14</p>
+                    <h1 className="text-4xl font-bold tracking-tight text-foreground">CAP ALPHA PROTOCOL // <span className="text-emerald-500">EXECUTIVE SUITE</span></h1>
+                    <p className="text-muted-foreground mt-2">Advanced Roster Architecture // v2026.02.14 // <span className="text-emerald-500">BETA ACCESS</span></p>
                 </div>
                 <div className="flex gap-4 items-center">
                     <SignedOut>

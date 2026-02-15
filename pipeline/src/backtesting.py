@@ -10,7 +10,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 class WalkForwardValidator:
-    def __init__(self, config_path="config/ml_config.yaml"):
+    def __init__(self, config_path="pipeline/config/ml_config.yaml"):
+        if not Path(config_path).exists():
+             # Fallback for running within pipeline dir
+             if Path("config/ml_config.yaml").exists():
+                 config_path = "config/ml_config.yaml"
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
         self.params = self.config["models"]["xgboost"]["params"]
@@ -67,14 +71,31 @@ class WalkForwardValidator:
                 "rmse": float(rmse),
                 "r2": float(r2),
                 "train_size": len(X_train),
-                "test_size": len(X_test)
+                "test_size": len(X_test),
+                "predictions": pd.DataFrame({
+                    "player_name": metadata.loc[test_mask, 'player_name'],
+                    "year": test_year,
+                    "team": metadata.loc[test_mask, 'team'],
+                    "actual": y_test,
+                    "predicted": preds
+                })
             })
         
         if not results:
             logger.error("❌ No valid backtest folds were produced!")
-            return pd.DataFrame(columns=["test_year", "rmse", "r2", "train_size", "test_size"])
+            return pd.DataFrame(columns=["test_year", "rmse", "r2", "train_size", "test_size"]), pd.DataFrame()
             
-        return pd.DataFrame(results)
+        # Compile all predictions into a single DataFrame
+        all_preds = []
+        clean_results = []
+        
+        for res in results:
+            if "predictions" in res:
+                all_preds.append(res.pop("predictions"))
+            clean_results.append(res)
+            
+        predictions_df = pd.concat(all_preds, ignore_index=True) if all_preds else pd.DataFrame()
+        return pd.DataFrame(clean_results), predictions_df
 
     def generate_report(self, results_df, report_path="reports/backtest_results.md"):
         if results_df.empty:

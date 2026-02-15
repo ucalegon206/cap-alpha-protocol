@@ -88,8 +88,18 @@ class RiskModeler:
         # 1. Run Backtest First
         from src.backtesting import WalkForwardValidator
         validator = WalkForwardValidator()
-        backtest_results = validator.run_backtest(X, y, metadata)
+        backtest_results, predictions_df = validator.run_backtest(X, y, metadata)
         validator.generate_report(backtest_results)
+        
+        # Save Historical Predictions for Frontend (Validation Layer)
+        if not predictions_df.empty:
+            # Assume running from project root
+            preds_target = Path("web/data/historical_predictions.json")
+            preds_target.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Simple JSON export
+            predictions_df.to_json(preds_target, orient="records", indent=2)
+            logger.info(f"✓ Historical Predictions saved to {preds_target}")
         
         # 2. Train Final Production Model on ALL History
         # We use all available data to predict the "unknown" future (2025/2026)
@@ -98,7 +108,10 @@ class RiskModeler:
         # Use config params
         try:
              import yaml
-             with open("config/ml_config.yaml", "r") as f:
+             config_path = "pipeline/config/ml_config.yaml"
+             if not Path(config_path).exists():
+                 config_path = "config/ml_config.yaml"
+             with open(config_path, "r") as f:
                   config = yaml.safe_load(f)
              params = config["models"]["xgboost"]["params"]
         except Exception as e:
@@ -157,7 +170,10 @@ class RiskModeler:
             logger.info("✓ Predictions persisted to 'prediction_results' table.")
         
         # 2. Save Model Artifact
-        with open("config/ml_config.yaml", "r") as f:
+        config_path = "pipeline/config/ml_config.yaml"
+        if not Path(config_path).exists():
+             config_path = "config/ml_config.yaml"
+        with open(config_path, "r") as f:
             ml_config = yaml.safe_load(f)
             
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

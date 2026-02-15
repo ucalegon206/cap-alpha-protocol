@@ -3,6 +3,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { PersonaProvider } from "@/components/persona-context";
+import { TeamProvider } from "@/components/team-context";
 import { ReactNode } from "react";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -13,9 +14,11 @@ export function Providers({ children }: { children: ReactNode }) {
                 variables: { colorPrimary: '#10b981' },
             }}
         >
-            <PersonaProvider>
-                {children}
-            </PersonaProvider>
+            <TeamProvider>
+                <PersonaProvider>
+                    {children}
+                </PersonaProvider>
+            </TeamProvider>
         </ClerkProvider>
     );
 }

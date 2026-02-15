@@ -193,7 +193,7 @@ export function EfficiencyLandscape({ data, teams = [] }: EfficiencyLandscapePro
             <CardContent className="h-[500px] w-full p-4 select-none">
                 <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart
-                        margin={{ top: 20, right: 30, bottom: 40, left: 40 }}
+                        margin={{ top: 20, right: 30, bottom: 40, left: 60 }}
                         onMouseDown={(e: any) => e && setRefAreaLeft(e.xValue)}
                         onMouseMove={(e: any) => refAreaLeft && e && setRefAreaRight(e.xValue)}
                         onMouseUp={zoom}
@@ -205,9 +205,9 @@ export function EfficiencyLandscape({ data, teams = [] }: EfficiencyLandscapePro
                             type="number"
                             dataKey="cap_hit_millions"
                             name={xName}
-                            unit="M"
                             domain={[left, right]}
-                            tickFormatter={(val) => `$${val}M`}
+                            tickFormatter={(val) => `$${Math.round(Number(val))}M`}
+                            allowDecimals={false}
                             allowDataOverflow
                         >
                             <Label value={xLabel} offset={0} position="bottom" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '12px', fontWeight: 500 }} />
@@ -216,9 +216,9 @@ export function EfficiencyLandscape({ data, teams = [] }: EfficiencyLandscapePro
                             type="number"
                             dataKey="surplus_value"
                             name={yName}
-                            unit="M"
-                            domain={[bottom, top]}
-                            tickFormatter={(val) => `$${val}M`}
+                            domain={[bottom, 'auto']}
+                            tickFormatter={(val) => `$${Math.round(Number(val))}M`}
+                            allowDecimals={false}
                             allowDataOverflow
                         >
                             <Label
